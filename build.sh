@@ -642,8 +642,11 @@ swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIAN
 "build/$FAN_HELPER_ID" --selftest
 
 echo "▸ Compiling MCP server…"
-MCP_SWIFT_FLAGS=()
-if (( DEV )); then MCP_SWIFT_FLAGS=(-Xswiftc -DVORSSAINT_DEVELOPMENT); fi
+# MCP Swift SDK 0.10's unused Network transport does not compile under the
+# newer compiler's Swift 6 concurrency checks. Keep the package in Swift 5
+# language mode until an SDK compatible with both supported toolchains exists.
+MCP_SWIFT_FLAGS=(-Xswiftc -swift-version -Xswiftc 5)
+if (( DEV )); then MCP_SWIFT_FLAGS+=(-Xswiftc -DVORSSAINT_DEVELOPMENT); fi
 swift build --package-path Tools/MCPServer -c release --product VorssaintMCP --force-resolved-versions "${MCP_SWIFT_FLAGS[@]}"
 MCP_BIN_DIR="$(swift build --package-path Tools/MCPServer -c release --show-bin-path "${MCP_SWIFT_FLAGS[@]}")"
 

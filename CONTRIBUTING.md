@@ -76,7 +76,7 @@ check MCP stdio through an isolated mock listener, build a separate test binary
 and run:
 
 ```sh
-swift build --package-path Tools/MCPServer --scratch-path /tmp/vorssaint-mcp-test-build -c release --product VorssaintMCP -Xswiftc -DVORSSAINT_MCP_TEST
+swift build --package-path Tools/MCPServer --scratch-path /tmp/vorssaint-mcp-test-build -c release --product VorssaintMCP -Xswiftc -swift-version -Xswiftc 5 -Xswiftc -DVORSSAINT_MCP_TEST
 python3 Tools/MCPServer/Tests/test_stdio_ipc.py /tmp/vorssaint-mcp-test-build/release/VorssaintMCP
 ```
 
