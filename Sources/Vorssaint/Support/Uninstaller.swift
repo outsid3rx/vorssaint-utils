@@ -17,16 +17,21 @@ enum Uninstaller {
         // The fan helper is a daemon service of its own, so unregistering the
         // main app as a login item never reaches it. Without this its root
         // registration outlives the bundle that carried its executable.
+        #if VORSSAINT_FORK
+        let detached = true
+        print("UNINSTALL: fan helper was not installed by this build")
+        #else
         let detached = FanControlService.restoreAndUnregisterForRemoval()
         print(detached
               ? "UNINSTALL: fan helper daemon unregistered"
               : "UNINSTALL: fan helper daemon still registered")
+        #endif
         // This runs before `NSApplication.shared` exists, so the password
         // dialog the in-app uninstall falls back to is not available here: it
         // brings the app forward through `NSApp`, which is still nil. Reporting
         // is all this path can do, and `Tools/uninstall.sh` reads the setting
         // back itself rather than trusting the line below.
-        if UserDefaults.standard.bool(forKey: DefaultsKey.sleepDisabledFlag) {
+        if Sudoers.clamshellSupported && UserDefaults.standard.bool(forKey: DefaultsKey.sleepDisabledFlag) {
             // A probe that did not answer proves nothing. Only a reading
             // that came back, and came back off, clears the restore.
             let probe = Shell.run("/usr/bin/pmset", ["-g"])

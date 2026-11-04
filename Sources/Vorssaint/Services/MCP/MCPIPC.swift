@@ -56,6 +56,8 @@ private enum MCPIPCSocket {
     static var directory: String {
         #if VORSSAINT_MCP_TEST
         return "/tmp/vorssaint-mcp-test-\(getuid())-\(getpid())"
+        #elseif VORSSAINT_FORK
+        return "/tmp/menuutility-mcp-\(getuid())"
         #elseif VORSSAINT_DEVELOPMENT
         return "/tmp/vorssaint-mcp-\(getuid())-dev"
         #else

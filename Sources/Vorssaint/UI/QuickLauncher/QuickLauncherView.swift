@@ -431,11 +431,13 @@ struct QuickLauncherView: View {
             }
             switch item {
             case .keepAwake:
+                #if !VORSSAINT_FORK
                 // Same guard as the panel's Keep awake card: enabling the
                 // closed-lid rule can run an admin setup step, and flipping
                 // the switch again mid-setup would race it.
                 Toggle(l10n.s.clamshellTitle, isOn: $keepAwake.clamshellPreferred)
                     .disabled(keepAwake.clamshellSetupInProgress)
+                #endif
                 Picker(l10n.s.defaultDurationLabel, selection: $defaultDuration) {
                     Text(l10n.s.minutes15).tag(15)
                     Text(l10n.s.minutes30).tag(30)

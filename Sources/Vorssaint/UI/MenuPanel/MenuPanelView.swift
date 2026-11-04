@@ -2795,13 +2795,14 @@ struct KeepAwakeCard: View {
 
                 optionsDisclosure
 
+                #if !VORSSAINT_FORK
                 Divider()
-
                 optionRow(title: l10n.s.clamshellTitle,
                           caption: clamshellCaption,
                           isOn: $awake.clamshellPreferred,
                           disabled: awake.clamshellSetupInProgress,
                           captionIsError: awake.clamshellSetupFailed)
+                #endif
             }
             .panelCard()
         }

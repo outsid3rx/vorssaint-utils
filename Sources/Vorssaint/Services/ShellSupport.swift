@@ -124,6 +124,13 @@ enum AdminShell {
 /// toggle without asking for the administrator password every time.
 /// The password is asked once, when installing (or removing) the rule.
 enum Sudoers {
+    static var clamshellSupported: Bool {
+        #if VORSSAINT_FORK
+        return false
+        #else
+        return true
+        #endif
+    }
     static let rulePath = "/etc/sudoers.d/vorssaint-clamshell"
     // Rule files written under earlier names; removed whenever the rule is
     // (re)installed or removed, so the closed-lid permission migrates without an
@@ -147,7 +154,8 @@ enum Sudoers {
     /// reported the rule as ready on Macs where the real call still asked for
     /// a password, which put every toggle behind a prompt (issue #269).
     static func isConfigured() -> Bool {
-        sleepStateQueue.sync {
+        guard clamshellSupported else { return false }
+        return sleepStateQueue.sync {
             guard sleepStateProbeSuspensions == 0 else { return false }
             let report = Shell.run("/usr/bin/pmset", ["-g"])
             guard report.status == 0 else { return false }
@@ -159,10 +167,11 @@ enum Sudoers {
     /// Uninstall offers the removal prompt from this instead of `isConfigured`,
     /// so a rule that stopped working still gets cleaned up.
     static var ruleFilesPresent: Bool {
-        ([rulePath] + legacyRulePaths).contains { FileManager.default.fileExists(atPath: $0) }
+        clamshellSupported && ([rulePath] + legacyRulePaths).contains { FileManager.default.fileExists(atPath: $0) }
     }
 
     static func install(completion: @escaping (Bool) -> Void) {
+        guard clamshellSupported else { completion(false); return }
         // Granted by uid, not username: a short name is free-form text on
         // SSO-enrolled Macs (name@company.com, #915) and the old validation
         // rejected it before the password prompt could even appear.
@@ -177,6 +186,7 @@ enum Sudoers {
     }
 
     static func remove(completion: @escaping (Bool) -> Void) {
+        guard clamshellSupported else { completion(true); return }
         // Also removes the rules left behind by earlier app names.
         let all = ([rulePath] + legacyRulePaths).joined(separator: " ")
         AdminShell.run("rm -f \(all)",
@@ -189,12 +199,14 @@ enum Sudoers {
     /// (returns false) when the rule is not installed.
     @discardableResult
     static func pmsetDisableSleep(_ on: Bool) -> Bool {
-        sleepStateQueue.sync { pmsetDisableSleepOnQueue(on) }
+        guard clamshellSupported else { return false }
+        return sleepStateQueue.sync { pmsetDisableSleepOnQueue(on) }
     }
 
     /// Queues asynchronous writes directly in request order. Completions
     /// must not wait for the main thread or for administrator authorization.
     static func pmsetDisableSleep(_ on: Bool, completion: @escaping (Bool) -> Void) {
+        guard clamshellSupported else { completion(false); return }
         sleepStateQueue.async {
             completion(pmsetDisableSleepOnQueue(on))
         }
@@ -206,6 +218,7 @@ enum Sudoers {
     static func restoreSleepWithAuthorization(prompt: String,
                                               shouldProceed: @escaping () -> Bool,
                                               completion: @escaping (Bool) -> Void) {
+        guard clamshellSupported else { completion(false); return }
         sleepStateQueue.async {
             sleepStateProbeSuspensions += 1
             let finish: (Bool) -> Void = { ok in

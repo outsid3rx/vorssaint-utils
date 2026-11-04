@@ -137,7 +137,7 @@ struct RecorderEditorView: View {
                 .disabled(model.isExporting)
             }
 
-            if sharingEnabled {
+            if sharingEnabled && ScreenshotSharingSupport.publicSharingAvailable {
                 shareMenu
             }
 

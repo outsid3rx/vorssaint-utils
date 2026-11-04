@@ -48,6 +48,7 @@ private struct FeedbackSubmission: Codable {
 }
 
 enum FeedbackError: Error {
+    case forkUnavailable
     case unavailable
     case rateLimited
     case rejected
@@ -77,6 +78,9 @@ final class FeedbackService {
     func submit(kind: FeedbackKind,
                 message: String,
                 diagnostics: FeedbackDiagnostics?) async throws {
+        #if VORSSAINT_FORK
+        throw FeedbackError.forkUnavailable
+        #else
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.utf16.count >= 10, trimmed.utf16.count <= 2_000 else {
             throw FeedbackError.rejected
@@ -119,5 +123,6 @@ final class FeedbackService {
         default:
             throw FeedbackError.rejected
         }
+        #endif
     }
 }

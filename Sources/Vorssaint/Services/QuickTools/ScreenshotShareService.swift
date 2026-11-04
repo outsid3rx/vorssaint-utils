@@ -75,6 +75,7 @@ final class ScreenshotShareService: ObservableObject {
 
     func createLink(pngData: Data,
                     duration: ScreenshotShareDuration) async throws -> ScreenshotShareRecord {
+        guard ScreenshotSharingSupport.publicSharingAvailable else { throw ScreenshotShareError.unavailable }
         guard AppFeature.screenshot.isAvailable,
               UserDefaults.standard.bool(forKey: DefaultsKey.screenshotSharingEnabled) else {
             throw ScreenshotShareError.unavailable
@@ -169,6 +170,7 @@ final class ScreenshotShareService: ObservableObject {
     }
 
     private func deleteRemote(_ record: ScreenshotShareRecord) async throws {
+        guard ScreenshotSharingSupport.publicSharingAvailable else { throw ScreenshotShareError.unavailable }
         let url = record.endpoint.appendingPathComponent("v1", isDirectory: true)
             .appendingPathComponent("screenshots", isDirectory: true)
             .appendingPathComponent(record.id, isDirectory: false)

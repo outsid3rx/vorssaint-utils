@@ -10,7 +10,7 @@ enum OnboardingMode {
     case full
 
     func title(_ strings: Strings) -> String {
-        strings.obStepWelcomeTitle
+        strings.obStepWelcomeTitle.replacingOccurrences(of: "Vorssaint", with: AppInfo.name)
     }
 }
 

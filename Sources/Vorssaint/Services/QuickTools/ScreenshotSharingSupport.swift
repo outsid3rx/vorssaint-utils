@@ -62,8 +62,16 @@ struct ScreenshotShareResponse: Decodable {
 }
 
 enum ScreenshotSharingSupport {
+    static var publicSharingAvailable: Bool {
+        #if VORSSAINT_FORK
+        return false
+        #else
+        return true
+        #endif
+    }
+
     static func uploadShortcutEnabled(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: DefaultsKey.screenshotUploadShortcutEnabled)
+        publicSharingAvailable && defaults.bool(forKey: DefaultsKey.screenshotUploadShortcutEnabled)
             && defaults.bool(forKey: DefaultsKey.screenshotSharingEnabled)
     }
 

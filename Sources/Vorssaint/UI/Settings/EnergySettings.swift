@@ -267,6 +267,10 @@ struct EnergySettings: View {
                 }
             }
             Divider()
+            #if VORSSAINT_FORK
+            SettingsRow(symbol: "laptopcomputer", title: l10n.s.clamshellTitle,
+                        caption: l10n.language == .ru ? "Отключено в этой сборке." : "Disabled in this build.") { EmptyView() }
+            #else
             SettingsRow(symbol: "laptopcomputer", title: l10n.s.clamshellTitle, caption: clamshellCaption) {
                 Toggle(l10n.s.clamshellTitle, isOn: $awake.clamshellPreferred)
                     .labelsHidden()
@@ -286,6 +290,7 @@ struct EnergySettings: View {
                 }
                 .padding(.leading, settingsRowTextInset)
             }
+            #endif
         }
     }
 

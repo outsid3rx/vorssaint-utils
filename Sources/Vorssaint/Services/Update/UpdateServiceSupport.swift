@@ -8,6 +8,16 @@ import Foundation
 /// Semantic Versioning 2.0.0, handling stable and pre-release (beta, rc, alpha) channels.
 enum UpdateServiceSupport {
 
+    /// Fork builds are distributed separately and must never install the
+    /// upstream project's releases over themselves.
+    static var selfUpdatesAvailable: Bool {
+        #if VORSSAINT_FORK
+        return false
+        #else
+        return true
+        #endif
+    }
+
     static func sha256Matches(_ data: Data, expectedHex: String) -> Bool {
         guard expectedHex.utf8.count == SHA256.byteCount * 2 else { return false }
         let actual = SHA256.hash(data: data)

@@ -208,7 +208,8 @@ struct ScreenshotCaptureSettings: View {
                 Text(strings.toolShortcutsTitle)
             }
 
-            Section {
+            if ScreenshotSharingSupport.publicSharingAvailable {
+              Section {
                 Toggle(strings.shareEnabledToggle, isOn: $sharingEnabled)
                     .onChange(of: sharingEnabled) { _, _ in service.syncWithPreferences() }
                 if sharingEnabled {
@@ -257,6 +258,12 @@ struct ScreenshotCaptureSettings: View {
                 }
             } header: {
                 Text(strings.shareSectionTitle)
+            }
+            } else {
+                Section {
+                    Text(l10n.language == .ru ? "Публикация по ссылке отключена в этой сборке." : "Link sharing is disabled in this build.")
+                        .foregroundStyle(.secondary)
+                } header: { Text(strings.shareSectionTitle) }
             }
         }
         .onAppear { sharing.refresh() }

@@ -219,6 +219,10 @@ struct FeedbackView: View {
                 )
                 wasSent = true
                 message = ""
+            } catch FeedbackError.forkUnavailable {
+                errorMessage = l10n.language == .ru
+                    ? "Отправка отзывов отключена в этой сборке."
+                    : "Feedback submission is disabled in this build."
             } catch FeedbackError.rateLimited {
                 errorMessage = strings.rateLimitError
             } catch FeedbackError.unavailable {
