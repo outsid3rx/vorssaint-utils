@@ -29,6 +29,23 @@ final class MCPControl: ObservableObject {
                   UserDefaults.standard.bool(forKey: DefaultsKey.mcpEnabled) else {
                 return MCPIPCResponse(ok: false, error: "disabled")
             }
+            if request.command.hasPrefix("audio_") {
+                guard UserDefaults.standard.bool(forKey: DefaultsKey.mcpAudioEnabled) else {
+                    return MCPIPCResponse(ok: false, error: "audio_disabled")
+                }
+                return MCPAudioAdapter.execute(request) ?? MCPIPCResponse(ok: false, error: "invalid_command")
+            }
+            if request.command.hasPrefix("display_") || request.command.hasPrefix("window_") {
+                let key = request.command.hasPrefix("display_") ? DefaultsKey.mcpDisplayEnabled : DefaultsKey.mcpWindowEnabled
+                guard UserDefaults.standard.bool(forKey: key) else {
+                    return MCPIPCResponse(ok: false, error: "category_disabled")
+                }
+                return MCPDisplayWindowAdapter.execute(request) ?? MCPIPCResponse(ok: false, error: "invalid_command")
+            }
+            guard request.id == nil, request.value == nil, request.action == nil, request.muted == nil,
+                  request.offset == nil, request.outputOffset == nil else {
+                return MCPIPCResponse(ok: false, error: "invalid_arguments")
+            }
             let command: MCPKeepAwakeCommand
             switch request.command {
             case "status" where request.minutes == nil: command = .status

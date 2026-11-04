@@ -230,6 +230,9 @@ struct MetricsTests {
                 KeepAwakeLidSleepTests.run { suite.expect($0, $1) }
                 KeepAwakeTimerHandoffTests.run { suite.expect($0, $1) }
             }),
+            ("mcp-controls", {
+                MCPDisplayWindowTests.run(suite)
+            }),
             ("wallpaper", {
                 WallpaperContract.run(suite)
                 WallpaperThumbnailTests.run(suite)

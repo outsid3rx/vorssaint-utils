@@ -19,6 +19,9 @@ struct GeneralSettings: View {
     @State private var loginRefreshID = UUID()
     @AppStorage(DefaultsKey.hotkeyEnabled) private var hotkeyEnabled = true
     @AppStorage(DefaultsKey.mcpEnabled) private var mcpEnabled = false
+    @AppStorage(DefaultsKey.mcpAudioEnabled) private var mcpAudioEnabled = false
+    @AppStorage(DefaultsKey.mcpDisplayEnabled) private var mcpDisplayEnabled = false
+    @AppStorage(DefaultsKey.mcpWindowEnabled) private var mcpWindowEnabled = false
 
     private var text: GeneralSettingsStrings { FeatureStrings.generalSettings(l10n.language) }
     private var appearanceStrings: AppearanceStrings { FeatureStrings.appearance(l10n.language) }
@@ -55,29 +58,57 @@ struct GeneralSettings: View {
                     .toggleStyle(.switch)
                     .onChange(of: mcpEnabled) { _, _ in MCPControl.shared.syncWithPreferences() }
             }
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(mcpCategoryLabels.0, isOn: $mcpAudioEnabled)
+                Toggle(mcpCategoryLabels.1, isOn: $mcpDisplayEnabled)
+                Toggle(mcpCategoryLabels.2, isOn: $mcpWindowEnabled)
+            }
+            .toggleStyle(TrailingSwitchToggleStyle())
+            .disabled(!mcpEnabled)
+            .padding(.leading, settingsRowTextInset)
             if let error = mcp.lastError {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
         }
     }
 
+    private var mcpCategoryLabels: (String, String, String) {
+        switch l10n.language {
+        case .enUS: return ("Sound and audio output", "Displays and brightness", "Active window layout")
+        case .ru: return ("Звук и аудиовыход", "Дисплеи и яркость", "Расположение активного окна")
+        case .uk: return ("Звук та аудіовихід", "Дисплеї та яскравість", "Розташування активного вікна")
+        case .ptBR: return ("Som e saída de áudio", "Telas e brilho", "Posição da janela ativa")
+        case .tr: return ("Ses ve ses çıkışı", "Ekranlar ve parlaklık", "Etkin pencere düzeni")
+        case .es: return ("Sonido y salida de audio", "Pantallas y brillo", "Posición de la ventana activa")
+        case .sk: return ("Zvuk a zvukový výstup", "Displeje a jas", "Rozloženie aktívneho okna")
+        case .de: return ("Ton und Audioausgang", "Displays und Helligkeit", "Anordnung des aktiven Fensters")
+        case .fr: return ("Son et sortie audio", "Écrans et luminosité", "Disposition de la fenêtre active")
+        case .it: return ("Audio e uscita audio", "Schermi e luminosità", "Posizione della finestra attiva")
+        case .ja: return ("サウンドと音声出力", "ディスプレイと明るさ", "アクティブなウインドウの配置")
+        case .ko: return ("사운드 및 오디오 출력", "디스플레이 및 밝기", "활성 윈도우 배치")
+        case .zhHans: return ("声音和音频输出", "显示器和亮度", "活动窗口布局")
+        case .zhTW: return ("聲音與音訊輸出", "顯示器與亮度", "使用中視窗的排列")
+        case .zhHK: return ("聲音與音訊輸出", "顯示器與亮度", "使用中視窗的排列")
+        }
+    }
+
     private var mcpCaption: String {
         switch l10n.language {
-        case .enUS: return "Allow processes on this Mac user account to control Keep Awake through MCP."
-        case .ru: return "Разрешить процессам этой учётной записи управлять режимом без сна через MCP."
-        case .uk: return "Дозволити процесам цього облікового запису керувати режимом без сну через MCP."
-        case .ptBR: return "Permitir que processos desta conta controlem o modo ativo via MCP."
-        case .tr: return "Bu kullanıcı hesabındaki işlemlerin MCP ile uyanık kalma modunu yönetmesine izin ver."
-        case .es: return "Permitir que los procesos de esta cuenta controlen el modo activo mediante MCP."
-        case .sk: return "Povoliť procesom tohto účtu ovládať režim bdenia cez MCP."
-        case .de: return "Prozessen dieses Benutzerkontos erlauben, Wachhalten über MCP zu steuern."
-        case .fr: return "Autoriser les processus de ce compte à contrôler le maintien éveillé via MCP."
-        case .it: return "Consenti ai processi di questo account di controllare la modalità attiva tramite MCP."
-        case .ja: return "このユーザーのプロセスによる MCP を使ったスリープ防止の制御を許可します。"
-        case .ko: return "이 사용자 계정의 프로세스가 MCP로 잠자기 방지를 제어하도록 허용합니다."
-        case .zhHans: return "允许此用户账户的进程通过 MCP 控制防止睡眠。"
-        case .zhTW: return "允許此使用者帳號的程序透過 MCP 控制防止睡眠。"
-        case .zhHK: return "允許此使用者帳戶的程序透過 MCP 控制防止睡眠。"
+        case .enUS: return "Allow processes on this Mac user account to control Keep Awake and the selected features through MCP."
+        case .ru: return "Разрешить процессам этой учётной записи управлять режимом без сна и выбранными функциями через MCP."
+        case .uk: return "Дозволити процесам цього облікового запису керувати режимом без сну та вибраними функціями через MCP."
+        case .ptBR: return "Permitir que processos desta conta controlem o modo ativo e as funções escolhidas via MCP."
+        case .tr: return "Bu hesapta çalışan işlemlerin uyanık kalma modunu ve seçilen özellikleri MCP ile yönetmesine izin ver."
+        case .es: return "Permitir que los procesos de esta cuenta controlen el modo activo y las funciones elegidas mediante MCP."
+        case .sk: return "Povoliť procesom tohto účtu ovládať režim bdenia a vybrané funkcie cez MCP."
+        case .de: return "Prozessen dieses Benutzerkontos erlauben, Wachhalten und ausgewählte Funktionen über MCP zu steuern."
+        case .fr: return "Autoriser les processus de ce compte à contrôler le maintien éveillé et les fonctions choisies via MCP."
+        case .it: return "Consenti ai processi di questo account di controllare la modalità attiva e le funzioni selezionate tramite MCP."
+        case .ja: return "このユーザーのプロセスによる MCP を使ったスリープ防止と選択した機能の制御を許可します。"
+        case .ko: return "이 사용자 계정의 프로세스가 MCP로 잠자기 방지와 선택한 기능을 제어하도록 허용합니다."
+        case .zhHans: return "允许此用户账户的进程通过 MCP 控制防止睡眠和所选功能。"
+        case .zhTW: return "允許此使用者帳號的程序透過 MCP 控制防止睡眠和所選功能。"
+        case .zhHK: return "允許此使用者帳戶的程序透過 MCP 控制防止睡眠和所選功能。"
         }
     }
 

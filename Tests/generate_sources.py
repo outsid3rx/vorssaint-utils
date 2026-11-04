@@ -996,8 +996,12 @@ def main():
           + "func selectOutput(_ device: AudioObjectID?, volume: Double?, muted: Bool?) {\n"
           + "removeOutputControlListeners(); outputControlListenerDevice = device; applyOutputControls(volume: volume, muted: muted)\n}\n"
           + "func readSnapshot(volume: Double?, muted: Bool?) { applyOutputControls(volume: volume, muted: muted) }\n"
-          + "".join(declaration(mixer, prefix) for prefix in [
-              "    func requestOutputAdjustment(", "    private func enqueueOutputAdjustment(", "    private func removeOutputControlListeners(",
+          + "".join(declaration(mixer, prefix).replace(
+                    "    func requestOutputAdjustment(", "    @discardableResult\n    func requestOutputAdjustment(", 1)
+                    if prefix == "    func requestOutputAdjustment(" else declaration(mixer, prefix)
+                    for prefix in [
+              "    func requestOutputAdjustment(", "    private func canEnqueueOutputAdjustment(",
+              "    private func enqueueOutputAdjustment(", "    private func removeOutputControlListeners(",
               "    func requestOutputStep(", "    func requestOutputMuteToggle(",
               "    private func enqueueOutputKey(", "    private func readOutputForQueuedKeys(",
               "    private func settleQueuedOutputSteps(",

@@ -7,7 +7,17 @@ import Darwin
 struct MCPIPCRequest: Codable, Sendable {
     let command: String
     let minutes: Int?
-    init(command: String, minutes: Int? = nil) { self.command = command; self.minutes = minutes }
+    let id: String?
+    let value: Double?
+    let action: String?
+    let muted: Bool?
+    let offset: Int?
+    let outputOffset: Int?
+    init(command: String, minutes: Int? = nil, id: String? = nil, value: Double? = nil,
+         action: String? = nil, muted: Bool? = nil, offset: Int? = nil, outputOffset: Int? = nil) {
+        self.command = command; self.minutes = minutes; self.id = id; self.value = value
+        self.action = action; self.muted = muted; self.offset = offset; self.outputOffset = outputOffset
+    }
 }
 
 struct MCPIPCResponse: Codable, Sendable {
@@ -17,6 +27,7 @@ struct MCPIPCResponse: Codable, Sendable {
     var endDate: String? = nil
     var sessionTrigger: String? = nil
     var error: String? = nil
+    var payload: String? = nil
 }
 
 enum MCPIPCError: Error, LocalizedError {

@@ -131,6 +131,9 @@ enum SettingsBackupSupport {
     static let machineStateKeys: Set<String> = [
         // Local agent control must be explicitly enabled on each Mac.
         DefaultsKey.mcpEnabled,
+        DefaultsKey.mcpAudioEnabled,
+        DefaultsKey.mcpDisplayEnabled,
+        DefaultsKey.mcpWindowEnabled,
         DefaultsKey.displaysSwitchedOff,
         DefaultsKey.displaysSwitchedOffFingerprints,
         // Agent profiles are folders on this Mac whose sign-in the cards use,

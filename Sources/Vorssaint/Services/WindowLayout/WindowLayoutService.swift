@@ -13,6 +13,9 @@ enum WindowLayoutError: Equatable {
     case noWindow
     case noRestore
     case failed
+    case sessionInactive
+    case ignoredApp
+    case mcpDisabled
 }
 
 enum WindowLayoutResult: Equatable {
@@ -227,12 +230,18 @@ final class WindowLayoutService: ObservableObject {
     }
 
     @discardableResult
-    func apply(_ action: WindowLayoutAction) -> WindowLayoutResult {
+    func apply(_ action: WindowLayoutAction, expectedFrontmostPID: pid_t? = nil) -> WindowLayoutResult {
         guard AXIsProcessTrusted() else {
             return finish(.failure(.missingAccessibility))
         }
-        guard let target = focusedTarget(for: action) else {
+        if let expectedFrontmostPID, let error = controlledWindowGuard(pid: expectedFrontmostPID) {
+            return finish(.failure(error))
+        }
+        guard let target = focusedTarget(for: action, onlyFocusedPID: expectedFrontmostPID) else {
             return finish(.failure(.noWindow))
+        }
+        if let expectedFrontmostPID, let error = controlledWindowGuard(pid: expectedFrontmostPID) {
+            return finish(.failure(error))
         }
         pruneWindowState(keeping: target.key)
 
@@ -241,12 +250,13 @@ final class WindowLayoutService: ObservableObject {
                                                           current: target.frame) else {
                 return finish(.failure(.noRestore))
             }
-            if setFrame(previous, on: target.window, windowKey: target.key) {
+            if setFrame(previous, on: target.window, windowKey: target.key,
+                        expectedFrontmostPID: expectedFrontmostPID) {
                 lastActions.removeValue(forKey: target.key)
                 return finish(.success(restored: true))
             }
             frameHistory.record(previous, for: target.key)
-            return finish(.failure(.failed))
+            return finish(.failure(expectedFrontmostPID.flatMap { controlledWindowGuard(pid: $0) } ?? .failed))
         }
 
         if action == .fullScreen {
@@ -296,15 +306,15 @@ final class WindowLayoutService: ObservableObject {
                         screenVisibleFrame: destination.windowLayoutVisibleFrame,
                         action: action,
                         on: target.window,
-                        windowKey: target.key) {
+                        windowKey: target.key, expectedFrontmostPID: expectedFrontmostPID) {
                 lastActions[target.key] = action
                 return finish(.success(restored: false))
             }
             frameHistory.discardLatest(for: target.key)
-            return finish(.failure(.failed))
+            return finish(.failure(expectedFrontmostPID.flatMap { controlledWindowGuard(pid: $0) } ?? .failed))
         }
         let sideRepeatCyclesThirds = WindowLayoutSideRepeat.cyclesThirds
-        if let crossing = WindowLayoutGeometry.displayCrossing(for: action,
+        if expectedFrontmostPID == nil, let crossing = WindowLayoutGeometry.displayCrossing(for: action,
                                                                previousAction: lastActions[target.key],
                                                                sideRepeatCyclesThirds: sideRepeatCyclesThirds),
            accepted(actual: target.frame,
@@ -326,7 +336,30 @@ final class WindowLayoutService: ObservableObject {
         return applyPlacement(action,
                               to: target,
                               visibleFrame: screen.windowLayoutVisibleFrame,
-                              sideRepeatCyclesThirds: sideRepeatCyclesThirds)
+                              cyclesRepeatedAction: expectedFrontmostPID == nil,
+                              sideRepeatCyclesThirds: sideRepeatCyclesThirds,
+                              expectedFrontmostPID: expectedFrontmostPID)
+    }
+
+    /// Recheck immediately before resolving and applying the target: focused
+    /// app exceptions and session state remain authoritative for MCP calls.
+    private func controlledWindowGuard(pid: pid_t) -> WindowLayoutError? {
+        guard AXIsProcessTrusted() else { return .missingAccessibility }
+        let app = NSWorkspace.shared.frontmostApplication
+        WindowLayoutIgnoredApps.shared.reload()
+        switch MCPDisplayWindowPolicy.windowBlock(
+            sessionActive: SessionActivity.shared.isActive, expectedPID: pid,
+            frontmostPID: app?.isTerminated == false ? app?.processIdentifier : nil,
+            isIgnored: WindowLayoutIgnoredApps.shared.contains(bundleID: app?.bundleIdentifier,
+                                                               executablePath: app?.executableURL?.path),
+            accessEnabled: UserDefaults.standard.bool(forKey: DefaultsKey.mcpEnabled)
+                && UserDefaults.standard.bool(forKey: DefaultsKey.mcpWindowEnabled)) {
+        case .accessDisabled: return .mcpDisabled
+        case .sessionInactive: return .sessionInactive
+        case .activeAppChanged: return .noWindow
+        case .ignoredApp: return .ignoredApp
+        case nil: return nil
+        }
     }
 
     /// Applies a pointer-selected snap target to one exact external window.
@@ -345,7 +378,8 @@ final class WindowLayoutService: ObservableObject {
                                 visibleFrame: NSRect,
                                 historyFrame: WindowLayoutFrame? = nil,
                                 cyclesRepeatedAction: Bool = true,
-                                sideRepeatCyclesThirds: Bool = false) -> WindowLayoutResult {
+                                sideRepeatCyclesThirds: Bool = false,
+                                expectedFrontmostPID: pid_t? = nil) -> WindowLayoutResult {
         let currentRect = appKitFrame(fromAX: target.frame)
         let previousAction = cyclesRepeatedAction ? lastActions[target.key] : nil
         let cyclePress = WindowLayoutGeometry.sideCyclePress(for: action,
@@ -387,15 +421,15 @@ final class WindowLayoutService: ObservableObject {
                     action: effectiveAction,
                     on: target.window,
                     windowKey: target.key,
-                    cyclePress: cyclePress) {
+                    cyclePress: cyclePress, expectedFrontmostPID: expectedFrontmostPID) {
             lastActions[target.key] = effectiveAction
             return finish(.success(restored: false))
         }
         frameHistory.discardLatest(for: target.key)
-        return finish(.failure(.failed))
+        return finish(.failure(expectedFrontmostPID.flatMap { controlledWindowGuard(pid: $0) } ?? .failed))
     }
 
-    private func focusedTarget(for action: WindowLayoutAction) -> WindowLayoutTarget? {
+    private func focusedTarget(for action: WindowLayoutAction, onlyFocusedPID: pid_t? = nil) -> WindowLayoutTarget? {
         let ownBundleID = Bundle.main.bundleIdentifier
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let ownKeyWindow = NSApp.keyWindow
@@ -405,7 +439,9 @@ final class WindowLayoutService: ObservableObject {
         let frontmost = hasFocusedResizableOwnWindow
             ? ownPID
             : NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let pids = ([frontmost].compactMap { $0 } + WindowUseTracker.shared.apps).reduce(into: [pid_t]()) { result, pid in
+        let candidates = onlyFocusedPID.map { [$0] }
+            ?? ([frontmost].compactMap { $0 } + WindowUseTracker.shared.apps)
+        let pids = candidates.reduce(into: [pid_t]()) { result, pid in
             if !result.contains(pid) { result.append(pid) }
         }
 
@@ -428,7 +464,10 @@ final class WindowLayoutService: ObservableObject {
             // Bounded AX: a hung app in the MRU list must not stall the main
             // thread (and every event tap) for the default timeout.
             AXUIElementSetMessagingTimeout(axApp, 0.35)
-            for attribute in [kAXFocusedWindowAttribute, kAXMainWindowAttribute] {
+            let attributes = onlyFocusedPID == nil
+                ? [kAXFocusedWindowAttribute, kAXMainWindowAttribute]
+                : [kAXFocusedWindowAttribute]
+            for attribute in attributes {
                 if let window = windowAttribute(axApp, attribute as String),
                    let target = target(from: window,
                                        app: app,
@@ -437,7 +476,7 @@ final class WindowLayoutService: ObservableObject {
                     return target
                 }
             }
-            if let windows = windowsAttribute(axApp),
+            if onlyFocusedPID == nil, let windows = windowsAttribute(axApp),
                let first = windows.compactMap({ target(from: $0,
                                                         app: app,
                                                         onScreenWindowIDs: onScreenWindowIDs,
@@ -539,13 +578,14 @@ final class WindowLayoutService: ObservableObject {
 
     private func setFrame(_ frame: WindowLayoutFrame,
                           on window: AXUIElement,
-                          windowKey: WindowLayoutWindowKey) -> Bool {
+                          windowKey: WindowLayoutWindowKey,
+                          expectedFrontmostPID: pid_t? = nil) -> Bool {
         setFrame(frame,
                  targetRect: appKitFrame(fromAX: frame),
                  screenVisibleFrame: bestScreen(for: frame)?.visibleFrame ?? appKitFrame(fromAX: frame),
                  action: .restore,
                  on: window,
-                 windowKey: windowKey)
+                 windowKey: windowKey, expectedFrontmostPID: expectedFrontmostPID)
     }
 
     private func setFrame(_ frame: WindowLayoutFrame,
@@ -554,7 +594,9 @@ final class WindowLayoutService: ObservableObject {
                           action: WindowLayoutAction,
                           on window: AXUIElement,
                           windowKey: WindowLayoutWindowKey,
-                          cyclePress: WindowLayoutAction? = nil) -> Bool {
+                          cyclePress: WindowLayoutAction? = nil,
+                          expectedFrontmostPID: pid_t? = nil) -> Bool {
+        if let expectedFrontmostPID, controlledWindowGuard(pid: expectedFrontmostPID) != nil { return false }
         let windowID = windowKey.windowID
         cancelSettle(for: windowID)
         assistiveModeSuspensions.removeValue(forKey: windowID)?.resume()
@@ -562,6 +604,10 @@ final class WindowLayoutService: ObservableObject {
 
         let original = self.frame(of: window)
         settledFrames.removeValue(forKey: windowKey)
+        if let expectedFrontmostPID, controlledWindowGuard(pid: expectedFrontmostPID) != nil {
+            assistiveModeSuspensions.removeValue(forKey: windowID)?.resume()
+            return false
+        }
         if attempt(frame, targetRect: targetRect, visibleFrame: screenVisibleFrame, action: action, on: window) {
             assistiveModeSuspensions.removeValue(forKey: windowID)?.resume()
             // Only the side size cycle uses the settled frame, so the read-back
@@ -598,6 +644,7 @@ final class WindowLayoutService: ObservableObject {
                                      previousAction: lastActions[windowKey],
                                      cyclePress: cyclePress,
                                      windowKey: windowKey,
+                                     expectedFrontmostPID: expectedFrontmostPID,
                                      resultGeneration: resultGeneration + 1),
                        attempt: 0)
         return true
@@ -646,10 +693,12 @@ final class WindowLayoutService: ObservableObject {
     }
 
     private func continueSettle(_ context: SettleContext, attempt: Int) {
+        if abortBlockedSettle(context) { return }
         if verified(context) {
             concludeSettle(context, success: true)
             return
         }
+        if abortBlockedSettle(context) { return }
         if self.attempt(context.frame,
                         targetRect: context.targetRect,
                         visibleFrame: context.screenVisibleFrame,
@@ -669,7 +718,9 @@ final class WindowLayoutService: ObservableObject {
             let maxFrame = axFrame(fromAppKit: WindowLayoutGeometry.rect(for: .maximize,
                                                                          current: currentRect,
                                                                          visibleFrame: context.screenVisibleFrame))
+            if abortBlockedSettle(context) { return }
             applyFrame(maxFrame, on: context.window)
+            if abortBlockedSettle(context) { return }
             if self.attempt(context.frame,
                             targetRect: context.targetRect,
                             visibleFrame: context.screenVisibleFrame,
@@ -682,6 +733,12 @@ final class WindowLayoutService: ObservableObject {
         concludeSettle(context, success: false)
     }
 
+    private func abortBlockedSettle(_ context: SettleContext) -> Bool {
+        guard let pid = context.expectedFrontmostPID, let error = controlledWindowGuard(pid: pid) else { return false }
+        concludeSettle(context, success: false, restoreOriginal: false, failure: error)
+        return true
+    }
+
     private func verified(_ context: SettleContext) -> Bool {
         guard let actual = frame(of: context.window) else { return false }
         return actual.isClose(to: context.frame, tolerance: frameTolerance)
@@ -691,9 +748,11 @@ final class WindowLayoutService: ObservableObject {
     // The action already reported success while the window was settling, so a
     // refusal this late restores the window, undoes the bookkeeping and
     // republishes the result the panel feedback listens to.
-    private func concludeSettle(_ context: SettleContext, success: Bool) {
+    private func concludeSettle(_ context: SettleContext, success: Bool,
+                                restoreOriginal: Bool = true, failure: WindowLayoutError = .failed) {
+        var blocked = context.expectedFrontmostPID.flatMap { controlledWindowGuard(pid: $0) }
         assistiveModeSuspensions.removeValue(forKey: context.windowID)?.resume()
-        if success {
+        if success && blocked == nil {
             if let cyclePress = context.cyclePress {
                 settledFrames[context.windowKey] = WindowLayoutSettledFrame(requested: context.frame,
                                                                             actual: frame(of: context.window) ?? context.frame,
@@ -702,7 +761,10 @@ final class WindowLayoutService: ObservableObject {
             return
         }
         settledFrames.removeValue(forKey: context.windowKey)
-        if let original = context.original {
+        if blocked == nil, let pid = context.expectedFrontmostPID {
+            blocked = controlledWindowGuard(pid: pid)
+        }
+        if restoreOriginal && blocked == nil, let original = context.original {
             applyFrame(original, on: context.window)
         }
         if context.action == .restore {
@@ -718,7 +780,7 @@ final class WindowLayoutService: ObservableObject {
         // A second action already published a fresh result; this stale
         // failure must not overwrite the feedback the person is reading.
         if context.resultGeneration == resultGeneration {
-            lastResult = .failure(.failed)
+            lastResult = .failure(blocked ?? failure)
         }
     }
 
@@ -3053,6 +3115,8 @@ private struct SettleContext {
     /// cannot cycle and so needs no read-back once it settles.
     let cyclePress: WindowLayoutAction?
     let windowKey: WindowLayoutWindowKey
+    /// MCP requests stop delayed retries when access, session or focus changes.
+    let expectedFrontmostPID: pid_t?
     /// Which published result this settle belongs to; a late failure only
     /// speaks when no newer action has published since.
     let resultGeneration: Int
