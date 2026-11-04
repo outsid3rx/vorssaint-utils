@@ -238,7 +238,7 @@ cd vorssaint-utils
 ./build.sh --dev --install  # install and launch it
 ```
 
-Xcode Command Line Tools are the only requirement. The [contributing guide](CONTRIBUTING.md) covers the layout and conventions. Official builds come only from the maintainer: the GPL covers the source, while the Vorssaint name, icon and look are covered by [TRADEMARKS.md](TRADEMARKS.md), so forks need their own identity.
+Xcode Command Line Tools with Swift 6.0 or newer and the MCP server's Swift packages are required. The [contributing guide](CONTRIBUTING.md) covers the layout and conventions. Official builds come only from the maintainer: the GPL covers the source, while the Vorssaint name, icon and look are covered by [TRADEMARKS.md](TRADEMARKS.md), so forks need their own identity.
 
 ## When something misbehaves
 
@@ -248,6 +248,7 @@ See [troubleshooting](docs/TROUBLESHOOTING.md) for launch problems, permissions 
 
 - [Privacy](docs/PRIVACY.md), what does and does not leave your Mac
 - [Permissions](docs/PERMISSIONS.md), every macOS permission in plain words
+- [Local MCP control](docs/MCP.md), connecting an agent to Keep Awake
 - [Troubleshooting](docs/TROUBLESHOOTING.md), the common fixes
 - [Contributing](CONTRIBUTING.md), build, layout and conventions
 - [Support](SUPPORT.md), where to get help

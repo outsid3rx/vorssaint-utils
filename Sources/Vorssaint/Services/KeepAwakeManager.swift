@@ -191,13 +191,19 @@ final class KeepAwakeManager: ObservableObject {
 
     func toggle() {
         if isActive {
-            if sessionTrigger == .automation || automationConditionsHold() {
-                automationSuppressedUntilConditionsClear = true
-            }
-            deactivate(reason: .manual)
+            stopManualSession()
         } else {
             startLastPick()
         }
+    }
+
+    /// Stop deliberately, suppressing an automatic restart until its conditions clear.
+    func stopManualSession() {
+        guard isActive else { return }
+        if sessionTrigger == .automation || automationConditionsHold() {
+            automationSuppressedUntilConditionsClear = true
+        }
+        deactivate(reason: .manual)
     }
 
     /// Keep Awake leaving the hub ends any running session; everything else

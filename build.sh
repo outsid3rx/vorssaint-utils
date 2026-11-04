@@ -153,12 +153,14 @@ finalize_installed_bundle_after_child() {
     local bundle="$1"
     local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
     local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
+    local mcp="$bundle/Contents/MacOS/VorssaintMCP"
     local devid
     devid="$(developer_id_identity)"
 
     echo "▸ Finalizing installed signature…"
     sleep 3
     if [[ -n "$devid" ]]; then
+        [[ -f "$mcp" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp --identifier "$APP_BUNDLE_ID.mcp" --sign "$devid" "$mcp"
         [[ -f "$helper" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs \
             --options runtime --timestamp --identifier "$FAN_HELPER_ID" --sign "$devid" "$helper"
         [[ -f "$adapter" ]] && codesign_with_timestamp_retry --force --strip-disallowed-xattrs \
@@ -166,12 +168,14 @@ finalize_installed_bundle_after_child() {
         codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
             --entitlements "$ENTITLEMENTS" --sign "$devid" "$bundle"
     elif legacy_identity_installed; then
+        [[ -f "$mcp" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs --identifier "$APP_BUNDLE_ID.mcp" --sign "$LEGACY_IDENTITY" "$mcp"
         [[ -f "$helper" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$FAN_HELPER_ID" --sign "$LEGACY_IDENTITY" "$helper"
         [[ -f "$adapter" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$LEGACY_IDENTITY" "$adapter"
         /usr/bin/codesign --force --strip-disallowed-xattrs --sign "$LEGACY_IDENTITY" "$bundle"
     else
+        [[ -f "$mcp" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs --identifier "$APP_BUNDLE_ID.mcp" --sign - "$mcp"
         [[ -f "$helper" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
             --identifier "$FAN_HELPER_ID" --sign - "$helper"
         [[ -f "$adapter" ]] && /usr/bin/codesign --force --strip-disallowed-xattrs \
@@ -180,6 +184,7 @@ finalize_installed_bundle_after_child() {
     fi
     [[ -f "$helper" ]] && /usr/bin/codesign --verify --strict "$helper"
     [[ -f "$adapter" ]] && /usr/bin/codesign --verify --strict "$adapter"
+    [[ -f "$mcp" ]] && /usr/bin/codesign --verify --strict "$mcp"
     /usr/bin/codesign --verify --deep --strict "$bundle"
     echo "✓ Signature ready: $bundle"
 }
@@ -540,6 +545,7 @@ if (( TEST )); then
         Sources/Vorssaint/Services/Metrics/MetricFormat.swift
         Sources/Vorssaint/Services/Metrics/VMStatisticsDecoder.swift
         Sources/Vorssaint/Services/KeepAwakeAutomationSupport.swift
+        Sources/Vorssaint/Services/MCP/MCPKeepAwakeSupport.swift
         Sources/Vorssaint/Services/SudoersSupport.swift
         Sources/Vorssaint/Services/Metrics/BatteryTimeSupport.swift
         Sources/Vorssaint/Services/Metrics/BatteryPowerSupport.swift
@@ -595,6 +601,7 @@ if (( TEST )); then
         ./Tests/PreferenceCleanupTests.sh || test_status=1
         ./Tests/UninstallSpacesTests.sh || test_status=1
         ./Tests/DeveloperInstallIsolationTests.sh || test_status=1
+        ./Tools/MCPServer/test-ipc.sh || test_status=1
     fi
     discard_test_preferences || test_status=1
     exit $test_status
@@ -633,6 +640,12 @@ swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" "${BUILD_VARIAN
     Sources/FanControlHelper/main.swift \
     -o "build/$FAN_HELPER_ID"
 "build/$FAN_HELPER_ID" --selftest
+
+echo "▸ Compiling MCP server…"
+MCP_SWIFT_FLAGS=()
+if (( DEV )); then MCP_SWIFT_FLAGS=(-Xswiftc -DVORSSAINT_DEVELOPMENT); fi
+swift build --package-path Tools/MCPServer -c release --product VorssaintMCP --force-resolved-versions "${MCP_SWIFT_FLAGS[@]}"
+MCP_BIN_DIR="$(swift build --package-path Tools/MCPServer -c release --show-bin-path "${MCP_SWIFT_FLAGS[@]}")"
 
 echo "▸ Compiling Now Playing adapter…"
 swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" -emit-library \
@@ -682,6 +695,7 @@ STAGE="$STAGE_TMP/$APP_NAME.app"
 mkdir -p "$STAGE/Contents/MacOS" "$STAGE/Contents/Resources" \
     "$STAGE/Contents/Library/LaunchDaemons" "$STAGE/Contents/Library/LaunchServices"
 cp "build/$EXECUTABLE" "$STAGE/Contents/MacOS/$EXECUTABLE"
+cp "$MCP_BIN_DIR/VorssaintMCP" "$STAGE/Contents/MacOS/VorssaintMCP"
 cp "build/$FAN_HELPER_ID" "$STAGE/Contents/Library/LaunchServices/$FAN_HELPER_ID"
 mkdir -p "$STAGE/Contents/Frameworks"
 cp "build/$NOW_PLAYING_ADAPTER" "$STAGE/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
@@ -782,14 +796,15 @@ codesign_fan_helper() {
 
 codesign_now_playing_adapter() {
     local target="$1"
+    local identifier="${2:-$NOW_PLAYING_ADAPTER_ID}"
     if [[ -n "$DEVID" ]]; then
         codesign_with_timestamp_retry --force --strip-disallowed-xattrs --options runtime --timestamp \
-            --identifier "$NOW_PLAYING_ADAPTER_ID" --sign "$DEVID" "$target"
+            --identifier "$identifier" --sign "$DEVID" "$target"
     elif legacy_identity_installed; then
-        codesign --force --strip-disallowed-xattrs --identifier "$NOW_PLAYING_ADAPTER_ID" \
+        codesign --force --strip-disallowed-xattrs --identifier "$identifier" \
             --sign "$LEGACY_IDENTITY" "$target"
     else
-        codesign --force --strip-disallowed-xattrs --identifier "$NOW_PLAYING_ADAPTER_ID" --sign - "$target"
+        codesign --force --strip-disallowed-xattrs --identifier "$identifier" --sign - "$target"
     fi
 }
 
@@ -798,6 +813,7 @@ sign_bundle() {
     local executable="$bundle/Contents/MacOS/$EXECUTABLE"
     local helper="$bundle/Contents/Library/LaunchServices/$FAN_HELPER_ID"
     local adapter="$bundle/Contents/Frameworks/$NOW_PLAYING_ADAPTER"
+    local mcp="$bundle/Contents/MacOS/VorssaintMCP"
 
     if [[ -n "$DEVID" ]]; then
         echo "  signing with Developer ID (hardened runtime): $DEVID"
@@ -808,6 +824,7 @@ sign_bundle() {
     fi
     [[ -f "$helper" ]] && codesign_fan_helper "$helper"
     [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
+    [[ -f "$mcp" ]] && codesign_now_playing_adapter "$mcp" "$APP_BUNDLE_ID.mcp"
     codesign_app "$bundle"
 
     # If local filesystem metadata invalidates the first signature, sign once
@@ -817,11 +834,13 @@ sign_bundle() {
         xattr -c -r "$bundle" 2>/dev/null || true
         [[ -f "$helper" ]] && codesign_fan_helper "$helper"
         [[ -f "$adapter" ]] && codesign_now_playing_adapter "$adapter"
+        [[ -f "$mcp" ]] && codesign_now_playing_adapter "$mcp" "$APP_BUNDLE_ID.mcp"
         codesign_app "$bundle"
     fi
     [[ -f "$executable" ]] && codesign --verify --strict "$executable"
     [[ -f "$helper" ]] && codesign --verify --strict "$helper"
     [[ -f "$adapter" ]] && codesign --verify --strict "$adapter"
+    [[ -f "$mcp" ]] && codesign --verify --strict "$mcp"
     codesign --verify --deep --strict "$bundle"
 }
 

@@ -9,6 +9,7 @@ struct GeneralSettings: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var appearance = AppAppearanceController.shared
     @ObservedObject private var hotkeys = HotkeyManager.shared
+    @ObservedObject private var mcp = MCPControl.shared
     // Seeded from the stored choice so the switch does not flash off while
     // the status read is still on its way.
     @State private var loginRegistration: LaunchAtLoginSupport.Registration =
@@ -17,6 +18,7 @@ struct GeneralSettings: View {
     @State private var loginPending = false
     @State private var loginRefreshID = UUID()
     @AppStorage(DefaultsKey.hotkeyEnabled) private var hotkeyEnabled = true
+    @AppStorage(DefaultsKey.mcpEnabled) private var mcpEnabled = false
 
     private var text: GeneralSettingsStrings { FeatureStrings.generalSettings(l10n.language) }
     private var appearanceStrings: AppearanceStrings { FeatureStrings.appearance(l10n.language) }
@@ -27,6 +29,7 @@ struct GeneralSettings: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text(l10n.s.tabGeneral).font(.title2.bold())
                 basicsCard
+                mcpCard
                 appearanceCard
                 if AppFeature.keepAwake.isAvailable {
                     shortcutCard
@@ -41,6 +44,40 @@ struct GeneralSettings: View {
         .onReceive(NotificationCenter.default.publisher(
             for: LaunchAtLoginSupport.settingsRefreshRequested)) { _ in
             refreshLaunchAtLogin()
+        }
+    }
+
+    private var mcpCard: some View {
+        SettingsCard {
+            SettingsRow(symbol: "sparkles", title: "MCP", caption: mcpCaption) {
+                Toggle("MCP", isOn: $mcpEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: mcpEnabled) { _, _ in MCPControl.shared.syncWithPreferences() }
+            }
+            if let error = mcp.lastError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var mcpCaption: String {
+        switch l10n.language {
+        case .enUS: return "Allow processes on this Mac user account to control Keep Awake through MCP."
+        case .ru: return "Разрешить процессам этой учётной записи управлять режимом без сна через MCP."
+        case .uk: return "Дозволити процесам цього облікового запису керувати режимом без сну через MCP."
+        case .ptBR: return "Permitir que processos desta conta controlem o modo ativo via MCP."
+        case .tr: return "Bu kullanıcı hesabındaki işlemlerin MCP ile uyanık kalma modunu yönetmesine izin ver."
+        case .es: return "Permitir que los procesos de esta cuenta controlen el modo activo mediante MCP."
+        case .sk: return "Povoliť procesom tohto účtu ovládať režim bdenia cez MCP."
+        case .de: return "Prozessen dieses Benutzerkontos erlauben, Wachhalten über MCP zu steuern."
+        case .fr: return "Autoriser les processus de ce compte à contrôler le maintien éveillé via MCP."
+        case .it: return "Consenti ai processi di questo account di controllare la modalità attiva tramite MCP."
+        case .ja: return "このユーザーのプロセスによる MCP を使ったスリープ防止の制御を許可します。"
+        case .ko: return "이 사용자 계정의 프로세스가 MCP로 잠자기 방지를 제어하도록 허용합니다."
+        case .zhHans: return "允许此用户账户的进程通过 MCP 控制防止睡眠。"
+        case .zhTW: return "允許此使用者帳號的程序透過 MCP 控制防止睡眠。"
+        case .zhHK: return "允許此使用者帳戶的程序透過 MCP 控制防止睡眠。"
         }
     }
 
