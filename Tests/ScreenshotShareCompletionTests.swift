@@ -404,9 +404,13 @@ enum ScreenshotShareCompletionTests {
             SharingDefaults.standard.enabled = scenario != "links off"
             AppFeature.available = scenario != "feature off"
             let png = Data([137, 80, 78, 71, 13, 10, 26, 10])
-            _ = try? await gate.createLink(pngData: png, duration: .oneHour)
-            suite.expect(gate.session.uploads == (scenario == "enabled" ? 1 : 0)
-                         && gate.writes == (scenario == "enabled" ? 1 : 0),
+            var rejected = false
+            do { _ = try await gate.createLink(pngData: png, duration: .oneHour) }
+            catch ScreenshotShareError.unavailable { rejected = true }
+            catch { }
+            let mayUpload = scenario == "enabled" && ScreenshotSharingSupport.publicSharingAvailable
+            suite.expect(rejected && gate.session.uploads == (mayUpload ? 1 : 0)
+                         && gate.writes == (mayUpload ? 1 : 0),
                          "service checks \(scenario) before persistence or any upload")
         }
         SharingDefaults.standard.enabled = true
@@ -420,6 +424,30 @@ enum ScreenshotShareCompletionTests {
                      && failedCopy.showingLink && failedCopy.dismissWork != nil,
                      "clipboard failure retains the existing link and copy controls in the preview")
 
+        #if VORSSAINT_FORK
+        // Even restored preferences cannot re-enable the fork's upload shortcut.
+        let disabledUpload = Uploader()
+        let disabledPreview = disabledUpload.showPreview()
+        service.copies = []
+        service.revoked = []
+        service.clipboard = "new capture"
+        disabledUpload.uploadLastCapture()
+        disabledUpload.uploadLastCapture()
+        suite.expect(disabledUpload.uploads == 0 && disabledUpload.completion == nil
+                     && service.copies.isEmpty && service.revoked.isEmpty
+                     && service.clipboard == "new capture" && !disabledPreview.closed,
+                     "fork rejects the upload shortcut without network or clipboard changes")
+        ScreenshotLastCaptureStore.stored = nil
+        disabledUpload.beginLatestCapture(8)
+        disabledUpload.syncLatestCapture(with: disabledUpload.defaults)
+        suite.expect(ScreenshotLastCaptureStore.stored == nil,
+                     "disabled fork upload does not retain a capture by itself")
+        disabledUpload.defaults.set(true, forKey: DefaultsKey.screenshotLastCaptureShortcutEnabled)
+        disabledUpload.beginLatestCapture(10)
+        disabledUpload.syncLatestCapture(with: disabledUpload.defaults)
+        suite.expect(ScreenshotLastCaptureStore.stored == 10,
+                     "edit latest shortcut still retains a capture in the fork")
+        #else
         for scenario in ["open", "closed", "released", "replaced", "standalone", "standalone replaced",
                          "history opened", "owner released", "feature off", "links off",
                          "editor opened", "editor closed", "capture discarded"] {
@@ -663,6 +691,7 @@ enum ScreenshotShareCompletionTests {
         suite.expect(editingWithHistory.uploadedCaptures == [2],
                      "an open history preview still uploads its own visible capture")
 
+        #endif
         // A preview's Copy text waits for the after-capture copy, so the
         // capture lands first and the text, when there is any, replaces it.
         let copying = Uploader()
