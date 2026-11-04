@@ -13,6 +13,11 @@ import VMStatisticsCompat
 
 enum UpdateFeatureTests {
     static func run(_ suite: TestSuite) {
+        #if VORSSAINT_FORK
+        suite.expect(!UpdateServiceSupport.selfUpdatesAvailable, "fork builds disable upstream self-updates")
+        #else
+        suite.expect(UpdateServiceSupport.selfUpdatesAvailable, "upstream builds retain self-updates")
+        #endif
         suite.expect(BrightnessUpdatePromptInfo.isUpgrade(appVersion: "3.4.0-beta.7",
                                                           previousVersion: "3.4.0-beta.6")
                     && BrightnessUpdatePromptInfo.isUpgrade(appVersion: "3.4.0",

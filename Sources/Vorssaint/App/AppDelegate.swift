@@ -1670,7 +1670,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        let aboutItem = NSMenuItem(title: strings.menuAbout, action: #selector(showAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: strings.menuAbout.replacingOccurrences(of: "Vorssaint", with: AppInfo.name), action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
 
@@ -1771,7 +1771,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
 
-        let about = NSMenuItem(title: strings.menuAbout, action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: strings.menuAbout.replacingOccurrences(of: "Vorssaint", with: AppInfo.name), action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         appMenu.addItem(about)
         appMenu.addItem(.separator())

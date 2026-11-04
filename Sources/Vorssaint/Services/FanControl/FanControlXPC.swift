@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Vorssaint
 
 import Foundation
-#if VORSSAINT_DEVELOPMENT
+#if VORSSAINT_DEVELOPMENT || VORSSAINT_FORK
 import Security
 import CryptoKit
 #endif
@@ -10,7 +10,9 @@ import CryptoKit
 enum FanControlIdentifiers {
     static let teamID = "3D485NHW29"
 
-    #if VORSSAINT_DEVELOPMENT
+    #if VORSSAINT_FORK
+    static let appBundleID = "com.outsid3rx.menuutilitymcp"
+    #elseif VORSSAINT_DEVELOPMENT
     static let appBundleID = "com.vorssaint.utils.dev"
     #else
     static let appBundleID = "com.vorssaint.utils"
@@ -20,7 +22,7 @@ enum FanControlIdentifiers {
     static let plistName = "\(helperID).plist"
 
     static var appCodeRequirement: String {
-        #if VORSSAINT_DEVELOPMENT
+        #if VORSSAINT_DEVELOPMENT || VORSSAINT_FORK
         guard let hash = self.currentLeafCertificateSHA1() else {
             return "identifier \"\(appBundleID)\" and certificate leaf = H\"0000000000000000000000000000000000000000\""
         }
@@ -31,7 +33,7 @@ enum FanControlIdentifiers {
     }
 
     static var helperCodeRequirement: String {
-        #if VORSSAINT_DEVELOPMENT
+        #if VORSSAINT_DEVELOPMENT || VORSSAINT_FORK
         guard let hash = self.currentLeafCertificateSHA1() else {
             return "identifier \"\(helperID)\" and certificate leaf = H\"0000000000000000000000000000000000000000\""
         }
@@ -41,7 +43,7 @@ enum FanControlIdentifiers {
         #endif
     }
 
-    #if VORSSAINT_DEVELOPMENT
+    #if VORSSAINT_DEVELOPMENT || VORSSAINT_FORK
     private static func currentLeafCertificateSHA1() -> String? {
         var dynamicCode: SecCode?
         guard SecCodeCopySelf([], &dynamicCode) == errSecSuccess,

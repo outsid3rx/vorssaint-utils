@@ -111,7 +111,7 @@ final class KeepAwakeManager: ObservableObject {
     private var preferenceSyncScheduled = false
 
     private init() {
-        clamshellPreferred = UserDefaults.standard.bool(forKey: DefaultsKey.clamshellPreferred)
+        clamshellPreferred = Sudoers.clamshellSupported && UserDefaults.standard.bool(forKey: DefaultsKey.clamshellPreferred)
         dimScreenOnLidClose = UserDefaults.standard.bool(forKey: DefaultsKey.dimScreenOnLidClose)
         refreshPasswordlessStatus()
         // Every settings write announces itself, including the ones made from
@@ -721,11 +721,12 @@ final class KeepAwakeManager: ObservableObject {
     // MARK: - Closed lid (pmset disablesleep)
 
     private var clamshellNeedsRestore: Bool {
-        clamshellActive || clamshellEnablePending || clamshellRestorePending
-            || UserDefaults.standard.bool(forKey: DefaultsKey.sleepDisabledFlag)
+        Sudoers.clamshellSupported && (clamshellActive || clamshellEnablePending || clamshellRestorePending
+            || UserDefaults.standard.bool(forKey: DefaultsKey.sleepDisabledFlag))
     }
 
     private func applyClamshellPreference() {
+        guard Sudoers.clamshellSupported else { return }
         guard !isTerminating, !clamshellRestorePending else { return }
         // A fresh user-driven attempt (toggle on, or a new session) gets one
         // automatic setup retry again.
@@ -946,6 +947,7 @@ final class KeepAwakeManager: ObservableObject {
     func recoverIfNeeded(completion: (() -> Void)? = nil) {
         guard !isTerminating else { return }
         recoverDimmedDisplayIfNeeded()
+        guard Sudoers.clamshellSupported else { finishRecovery(completion); return }
         guard UserDefaults.standard.bool(forKey: DefaultsKey.sleepDisabledFlag) else {
             finishRecovery(completion)
             return

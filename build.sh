@@ -29,12 +29,14 @@ trap 'exit 1' INT TERM HUP
 # Flags: --dev builds the local-only "Vorssaint (Developer)" variant (its own
 # bundle id, so it coexists with the official app); --install puts it in /Applications.
 DEV=0
+FORK=0
 INSTALL=0
 TEST=0
 TEST_ARGS=()
 for arg in "$@"; do
     case "$arg" in
         --dev)     DEV=1 ;;
+        --fork)    FORK=1 ;;
         --install) INSTALL=1 ;;
         --test)    TEST=1 ;;
         --test-suite=*) TEST=1; TEST_ARGS+=("--suite=${arg#*=}") ;;
@@ -42,7 +44,18 @@ for arg in "$@"; do
     esac
 done
 
-if (( DEV )); then
+if (( DEV && FORK )); then
+    echo 'Choose either --dev or --fork' >&2
+    exit 1
+fi
+if (( FORK )); then
+    APP_NAME="Menu Utility MCP"
+    EXECUTABLE="MenuUtilityMCP"
+    APP_BUNDLE_ID="com.outsid3rx.menuutilitymcp"
+    BUILD_VARIANT_FLAGS=(-D VORSSAINT_FORK)
+    APP_OPTIMIZATION_FLAGS=(-O)
+    BUILD_CONFIGURATION="release"
+elif (( DEV )); then
     APP_NAME="Vorssaint (Developer)"
     EXECUTABLE="VorssaintDeveloper"
     APP_BUNDLE_ID="com.vorssaint.utils.dev"
@@ -595,10 +608,12 @@ if (( TEST )); then
     TEST_OUTPUT_FILE_MAP="$TEST_OBJECT_DIR/output-file-map.json"
     write_swift_output_file_map "$TEST_OUTPUT_FILE_MAP" "$TEST_OBJECT_DIR" "${TEST_SOURCES[@]}"
     echo "▸ Building & running tests against $(basename "$SDK")…"
+    TEST_VARIANT_FLAGS=()
+    if (( FORK )); then TEST_VARIANT_FLAGS=(-D VORSSAINT_FORK); fi
     swiftc -Onone -incremental -enable-batch-mode -j "$(sysctl -n hw.logicalcpu)" \
         -module-name VorssaintTests -output-file-map "$TEST_OUTPUT_FILE_MAP" \
         -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" \
-        "${VM_STATISTICS_COMPAT_FLAGS[@]}" "${TEST_SOURCES[@]}" -o build/metrics-tests
+        "${VM_STATISTICS_COMPAT_FLAGS[@]}" "${TEST_VARIANT_FLAGS[@]}" "${TEST_SOURCES[@]}" -o build/metrics-tests
     test_status=0
     ./build/metrics-tests "${TEST_ARGS[@]}" || test_status=$?
     if (( ${#TEST_ARGS} == 0 )); then
@@ -653,6 +668,7 @@ echo "▸ Compiling MCP server…"
 # language mode until an SDK compatible with both supported toolchains exists.
 MCP_SWIFT_FLAGS=(-Xswiftc -swift-version -Xswiftc 5)
 if (( DEV )); then MCP_SWIFT_FLAGS+=(-Xswiftc -DVORSSAINT_DEVELOPMENT); fi
+if (( FORK )); then MCP_SWIFT_FLAGS+=(-Xswiftc -DVORSSAINT_FORK); fi
 swift build --package-path Tools/MCPServer -c release --product VorssaintMCP --force-resolved-versions "${MCP_SWIFT_FLAGS[@]}"
 MCP_BIN_DIR="$(swift build --package-path Tools/MCPServer -c release --show-bin-path "${MCP_SWIFT_FLAGS[@]}")"
 
@@ -667,12 +683,18 @@ swiftc -O -target "$TARGET" -sdk "$SDK" "${SDK_COMPAT_FLAGS[@]}" -emit-library \
     -o "build/$NOW_PLAYING_ADAPTER"
 
 echo "▸ Generating app icon…"
-swift Tools/MakeIcon.swift build/AppIcon.iconset
+if (( FORK )); then
+    swift Tools/MakeForkIcon.swift build/AppIcon.iconset
+else
+    swift Tools/MakeIcon.swift build/AppIcon.iconset
+fi
 xattr -c -r build/AppIcon.iconset build/AppIcon.icns build/MenuBarIcon.png build/MenuBarIcon@2x.png build/BrandMark.png 2>/dev/null || true
 ACTOOL_BIN="$(xcrun --find actool 2>/dev/null || true)"
 ICON_TMP="$(mktemp -d)"
 ADAPTIVE_SKIP=""
-if [[ -z "$ACTOOL_BIN" ]]; then
+if (( FORK )); then
+    ADAPTIVE_SKIP="fork uses its own icon"
+elif [[ -z "$ACTOOL_BIN" ]]; then
     ADAPTIVE_SKIP="actool not found (adaptive icons need Xcode 26+)"
 else
     echo "▸ Compiling adaptive icon catalog…"
@@ -717,7 +739,7 @@ cp CHANGELOG.md "$STAGE/Contents/Resources/CHANGELOG.md"
 for lproj in Resources/*.lproj(N); do
     cp -R "$lproj" "$STAGE/Contents/Resources/"
 done
-if (( DEV )); then
+if (( DEV || FORK )); then
     # A distinct identity so the Developer build installs and runs next to the
     # official app, with its own permissions, preferences and login item.
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $APP_BUNDLE_ID" "$STAGE/Contents/Info.plist"
@@ -732,10 +754,27 @@ if (( DEV )); then
     # Stamp the source commit + build time so the running dev app shows (in About)
     # exactly which code it was compiled from. Lets you verify it matches HEAD before
     # testing, instead of unknowingly running a stale build. Dev-only; never shipped.
-    SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-    [[ -n "$(git status --porcelain 2>/dev/null)" ]] && SHA="$SHA-dirty"
-    /usr/libexec/PlistBuddy -c "Add :VorssaintBuildCommit string '$SHA · $(date '+%Y-%m-%d %H:%M')'" "$STAGE/Contents/Info.plist"
-    echo "  stamped dev build: $SHA"
+    if (( DEV )); then
+        SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+        [[ -n "$(git status --porcelain 2>/dev/null)" ]] && SHA="$SHA-dirty"
+        /usr/libexec/PlistBuddy -c "Add :VorssaintBuildCommit string '$SHA · $(date '+%Y-%m-%d %H:%M')'" "$STAGE/Contents/Info.plist"
+        echo "  stamped dev build: $SHA"
+    fi
+    if (( FORK )); then
+        /usr/bin/python3 - "$STAGE/Contents" <<'PY'
+import pathlib, plistlib, sys
+root = pathlib.Path(sys.argv[1])
+plist = root / 'Info.plist'
+with plist.open('rb') as f: values = plistlib.load(f)
+for key, value in values.items():
+    if key.endswith('UsageDescription') and isinstance(value, str):
+        values[key] = value.replace('Vorssaint', 'Menu Utility MCP')
+with plist.open('wb') as f: plistlib.dump(values, f)
+for path in (root / 'Resources').glob('*.lproj/InfoPlist.strings'):
+    text = path.read_text(encoding='utf-8')
+    path.write_text(text.replace('Vorssaint', 'Menu Utility MCP'), encoding='utf-8')
+PY
+    fi
 fi
 FAN_HELPER_VERSION="$(
     export LC_ALL=C
@@ -940,7 +979,7 @@ if (( INSTALL )); then
     stop_process "$EXECUTABLE"
     # Only an official install replaces the pre-rename official apps. The
     # Developer variant must coexist with them just as it does with Vorssaint.
-    if (( ! DEV )); then
+    if (( ! DEV && ! FORK )); then
         for legacy in "Vorss:Vorss" "Vorssaint Utils:VorssaintUtils"; do
             name="${legacy%%:*}"; proc="${legacy##*:}"
             if [[ -d "/Applications/$name.app" ]]; then

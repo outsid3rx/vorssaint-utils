@@ -1018,7 +1018,10 @@ enum GlobalShortcutRole: CaseIterable, Identifiable {
     }
 
     func isAvailable(using isAvailable: (AppFeature) -> Bool) -> Bool {
-        availabilityFeatures.contains(where: isAvailable)
+        #if VORSSAINT_FORK
+        if self == .screenshotUpload { return false }
+        #endif
+        return availabilityFeatures.contains(where: isAvailable)
     }
 
     /// The features whose own shortcuts have to go quiet while the user is

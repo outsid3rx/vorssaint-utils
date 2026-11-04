@@ -729,7 +729,14 @@ struct AboutSettings: View {
                 aboutContent
             }
 
+            #if VORSSAINT_FORK
+            Section(l10n.s.updatesSection) {
+                Text("Updates for this fork are installed manually.")
+                Link("View fork releases", destination: URL(string: "https://github.com/outsid3rx/vorssaint-utils/releases")!)
+            }
+            #else
             UpdatesView()
+            #endif
         }
         .formStyle(.grouped)
     }

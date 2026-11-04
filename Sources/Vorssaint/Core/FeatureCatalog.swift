@@ -225,7 +225,10 @@ extension AppFeature {
     }
 
     func isAvailable(in defaults: UserDefaults) -> Bool {
-        defaults.bool(forKey: availabilityKey)
+        #if VORSSAINT_FORK
+        if self == .fanControl { return false }
+        #endif
+        return defaults.bool(forKey: availabilityKey)
     }
 
     /// The feature's own enable keys; any one being true means the feature is

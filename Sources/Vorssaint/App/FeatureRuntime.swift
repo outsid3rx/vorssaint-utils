@@ -400,6 +400,7 @@ final class FeatureRuntime: ObservableObject {
         .monitorDisk: { FeatureRuntime.syncMonitor() },
         .monitorPower: { FeatureRuntime.syncMonitor() },
         .fanControl: {
+            #if !VORSSAINT_FORK
             SystemMonitor.shared.planDidChange()
             let defaults = UserDefaults.standard
             let needsRecovery = defaults.bool(forKey: DefaultsKey.fanControlRecoveryNeeded)
@@ -407,6 +408,7 @@ final class FeatureRuntime: ObservableObject {
             if needsRecovery || (!AppFeature.fanControl.isAvailable && hasRegisteredHelper) {
                 FanControlService.shared.syncWithPreferences()
             }
+            #endif
         },
     ]
 
@@ -427,8 +429,14 @@ extension AppFeature {
     var hardwareUnsupportedReason: String? {
         switch self {
         case .fanControl:
+            #if VORSSAINT_FORK
+            return L10n.shared.language == .ru
+                ? "Управление вентиляторами отключено в этой сборке."
+                : "Fan control is disabled in this build."
+            #else
             return FanControlHardware.hasControllableFan
                 ? nil : FeatureStrings.fanControl(L10n.shared.language).noFans
+            #endif
         default:
             return nil
         }

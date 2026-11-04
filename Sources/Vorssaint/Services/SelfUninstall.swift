@@ -101,7 +101,11 @@ enum SelfUninstall {
                     }
                     // The helper must be safely removed before permissions go;
                     // a failure here keeps the app's existing grants intact.
+                    #if VORSSAINT_FORK
+                    let fanHelperWasRegistered = false
+                    #else
                     let fanHelperWasRegistered = FanControlService.hasRegisteredHelperForRemoval
+                    #endif
                     guard detachFanControl() else {
                         stop(L10n.shared.s.advancedUninstallFailedBody, sleepRestored: true)
                         return
@@ -195,7 +199,11 @@ enum SelfUninstall {
     }
 
     private static func detachFanControl() -> Bool {
-        FanControlService.restoreAndUnregisterForRemoval()
+        #if VORSSAINT_FORK
+        return true
+        #else
+        return FanControlService.restoreAndUnregisterForRemoval()
+        #endif
     }
 
     private static func detachLoginItem() {
@@ -217,6 +225,7 @@ enum SelfUninstall {
     /// anything has, which is why it may ask for the password the launch-time
     /// recovery would have asked for.
     private static func restoreSleepBeforeRemoval() -> Bool {
+        guard Sudoers.clamshellSupported else { return true }
         guard UserDefaults.standard.bool(forKey: DefaultsKey.sleepDisabledFlag) else { return true }
         // The flag can outlive the setting, so a stale one must not put a
         // password dialog in front of someone uninstalling. Only a reading that

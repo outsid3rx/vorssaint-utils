@@ -29,12 +29,16 @@ enum BundleMigration {
     /// name; the caller should then skip the rest of startup.
     @discardableResult
     static func run() -> Bool {
+        #if VORSSAINT_FORK
+        return false
+        #else
         let bundleURL = Bundle.main.bundleURL
         if bundleURL.lastPathComponent == oldName {
             return renameSelfAndRelaunch(from: bundleURL)
         }
         retireStrayOldBundle(running: bundleURL)
         return false
+        #endif
     }
 
     /// Renames our own bundle to the new name from a detached helper, then quits.

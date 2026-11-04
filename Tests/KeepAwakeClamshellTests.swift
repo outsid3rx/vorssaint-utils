@@ -41,6 +41,7 @@ extension KeepAwakeLidSleepContract {
         static func sleep(forTimeInterval interval: Double) { waits += 1; onWait?() }
     }
     enum Sudoers {
+        static let clamshellSupported = true
         // Extracted methods live in a qualified extension, whose lookup must
         // stay inside the fixture rather than finding application transports.
         typealias DispatchQueue = KeepAwakeLidSleepContract.DispatchQueue

@@ -100,7 +100,7 @@ enum ScreenshotFeatureTests {
                     uploadDefaults.set(editEnabled, forKey: DefaultsKey.screenshotLastCaptureShortcutEnabled)
                     uploadDefaults.set(uploadEnabled, forKey: DefaultsKey.screenshotUploadShortcutEnabled)
                     uploadDefaults.set(sharingEnabled, forKey: DefaultsKey.screenshotSharingEnabled)
-                    let canUpload = uploadEnabled && sharingEnabled
+                    let canUpload = uploadEnabled && sharingEnabled && ScreenshotSharingSupport.publicSharingAvailable
                     suite.expect(ScreenshotSharingSupport.uploadShortcutEnabled(in: uploadDefaults) == canUpload,
                                  "uploads require both the shortcut and sharing to be enabled")
                     suite.expect(ScreenshotSharingSupport.retainsLatestCapture(in: uploadDefaults)

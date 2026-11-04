@@ -4,7 +4,12 @@
 import Foundation
 import MCP
 
-let server = Server(name: "Vorssaint", version: "0.1.0", capabilities: .init(resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false)))
+#if VORSSAINT_FORK
+let serverName = "Menu Utility MCP"
+#else
+let serverName = "Vorssaint"
+#endif
+let server = Server(name: serverName, version: "0.1.0", capabilities: .init(resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false)))
 let emptySchema: Value = .object([
     "type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(false)
 ])

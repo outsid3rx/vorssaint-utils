@@ -1,11 +1,4 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/logo-dark.svg">
-    <img src="docs/assets/readme/logo.svg" width="220" alt="Vorssaint logo">
-  </picture>
-</p>
-
-<h1 align="center">Vorssaint</h1>
+<h1 align="center">Menu Utility MCP</h1>
 
 > This is an independent fork of [vorssaint/vorssaint-utils](https://github.com/vorssaint/vorssaint-utils) with local MCP control. It is not an official Vorssaint release.
 
@@ -15,13 +8,12 @@
 </p>
 
 <p align="center">
-  <a href="https://vorssaint.com">Website</a> ·
+  <a href="https://github.com/vorssaint/vorssaint-utils">Original project</a> ·
   <a href="#install">Install</a> ·
   <a href="#everything-it-does">Features</a> ·
   <a href="#private-by-default">Privacy</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="mailto:hello@vorssaint.com">Contact</a> ·
-  <a href="https://discord.gg/M6BwWH4BJp">Discord</a>
+  <a href="https://github.com/outsid3rx/vorssaint-utils/issues">Fork issues</a>
 </p>
 
 <p align="center">
@@ -30,40 +22,6 @@
   <a href="#what-you-need"><img src="https://img.shields.io/badge/macOS-14%2B%20Apple%20Silicon-black" alt="macOS 14 and newer, Apple Silicon"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License GPL 3.0 or later"></a>
 </p>
-
-<p align="center">
-  <a href="https://buymeacoffee.com/vorssaint">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" width="217" height="60" alt="Buy Me a Coffee">
-  </a>
-</p>
-
-<p align="center">
-  For anything private, email
-  <a href="mailto:hello@vorssaint.com"><strong>hello@vorssaint.com</strong></a>.
-</p>
-
-<p align="center">
-  <a href="https://trendshift.io/repositories/53716?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-53716" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/53716" alt="vorssaint/vorssaint-utils | Trendshift" width="250" height="55"></a>
-  <a href="https://trendshift.io/repositories/53716?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-53716" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/53716/weekly?language=Swift" alt="vorssaint/vorssaint-utils | Trendshift weekly ranking" width="250" height="55"></a>
-  <a href="https://trendshift.io/repositories/53716?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-53716" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/53716/monthly?language=Swift" alt="vorssaint/vorssaint-utils | Trendshift monthly ranking" width="250" height="55"></a>
-</p>
-
-<h2 align="center">Sponsors</h2>
-
-<p align="center">
-  Help keep Vorssaint free and open source. Share your product with Mac users.
-</p>
-
-<table align="center">
-  <tr>
-    <td align="center" width="520">
-      <br>
-      <strong>Your product here</strong><br>
-      <sub>Your logo · Your name · Your link</sub><br><br>
-      <a href="SPONSORS.md"><strong>Become our first sponsor →</strong></a><br><br>
-    </td>
-  </tr>
-</table>
 
 <p align="center">
   <img src="docs/assets/readme/panel-mixer.png" width="196" alt="Volume mixer with per app sliders, one app boosted past 100 percent">
@@ -189,7 +147,7 @@ Reorder or hide panel sections, choose a compact layout, and export settings to 
 
 ## Install
 
-Download the disk image from the [fork releases page](https://github.com/outsid3rx/vorssaint-utils/releases) and drag Vorssaint into Applications. Fork builds are not signed with an Apple Developer ID or notarized; macOS may require additional steps to open them, and permissions may need to be granted again after updates.
+Download the disk image from the [fork releases page](https://github.com/outsid3rx/vorssaint-utils/releases) and drag Menu Utility MCP into Applications. Fork builds have a separate identity and settings; automatic updates, fan control, closed-lid mode, feedback, and sharing via the original project’s services are disabled. They are not signed with an Apple Developer ID or notarized; macOS may require additional steps to open them, and permissions may need to be granted again after updates.
 
 The original project is also available through [Homebrew](https://brew.sh). This installs the official build, which does not include this fork's changes:
 
@@ -199,21 +157,11 @@ brew install --cask vorssaint
 
 ## Uninstall
 
-With Homebrew:
-
-```sh
-brew uninstall --cask vorssaint
-```
-
-To remove Vorssaint completely, including its settings and permissions:
-
-```sh
-./Tools/uninstall.sh
-```
+Move `Menu Utility MCP.app` to the Trash, or use its in-app uninstall option. Do not use `Tools/uninstall.sh`: it is for the original application.
 
 ## Private by default
 
-Vorssaint is local-first, with no account, analytics or tracking. The network is touched only by things you can see: update checks, the speed test, Homebrew actions, optional online lyric lookup, temporary screenshot or recording links and feedback you explicitly send. The full story is in the [privacy notes](docs/PRIVACY.md).
+Menu Utility MCP is local-first, with no account, analytics or tracking. Optional features such as speed tests, Homebrew actions and online lyrics may use the network. The original project’s temporary sharing, feedback and self-update services are disabled in the fork build. The full story is in the [privacy notes](docs/PRIVACY.md).
 
 Permissions get the same treatment. Every one is optional, the app explains each in plain words, shows which features actually use it, and even tells you when a permission you granted is no longer needed by anything, with a shortcut to revoke it.
 
@@ -233,8 +181,7 @@ See the [permissions guide](docs/PERMISSIONS.md) for which features need access 
 ```sh
 git clone https://github.com/outsid3rx/vorssaint-utils.git
 cd vorssaint-utils
-./build.sh --dev            # build the separate Developer variant
-./build.sh --dev --install  # install and launch it
+./build.sh --fork           # build the separately identified fork
 ```
 
 Xcode Command Line Tools with Swift 6.0 or newer and the MCP server's Swift packages are required. The [contributing guide](CONTRIBUTING.md) covers the layout and conventions. Official builds come only from the maintainer: the GPL covers the source, while the Vorssaint name, icon and look are covered by [TRADEMARKS.md](TRADEMARKS.md), so forks need their own identity.

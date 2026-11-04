@@ -26,6 +26,11 @@ separate socket and its executable is inside `Vorssaint (Developer).app`. The
 server does not start the app; requests fail when the app is not running or MCP
 is disabled. Turning the switch off closes the listener.
 
+The independently branded `--fork` build uses a separate socket and settings.
+For an installed fork, use
+`/Applications/Menu Utility MCP.app/Contents/MacOS/VorssaintMCP` as the command.
+It does not automatically import settings from the original app.
+
 The tools read the Keep Awake session, start it with one of the supported
 durations (0, 15, 30, 60, 120, 240 or 480 minutes; 0 means indefinite), and
 stop it. Starting again replaces the current session and saves the duration,
