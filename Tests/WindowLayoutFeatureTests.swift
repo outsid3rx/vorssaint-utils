@@ -1548,7 +1548,7 @@ enum WindowLayoutFeatureTests {
                                                             sideRepeatCyclesThirds: resumes) == side,
                    "window layout \(side.rawValue) after the two thirds shortcut places the half with the cycle on")
         }
-        let sideRepeatSetFrame = sideRepeatServiceSource.components(separatedBy: "cyclePress: WindowLayoutAction? = nil) -> Bool {")
+        let sideRepeatSetFrame = sideRepeatServiceSource.components(separatedBy: "cyclePress: WindowLayoutAction? = nil,")
             .dropFirst().first?.components(separatedBy: "scheduleSettle(SettleContext(").first ?? ""
         let sideRepeatConclude = sideRepeatServiceSource.components(separatedBy: "private func concludeSettle(")
             .dropFirst().first?.components(separatedBy: "return\n").first ?? ""
