@@ -14,6 +14,7 @@ final class MCPControl: ObservableObject {
 
     func syncWithPreferences() {
         precondition(Thread.isMainThread)
+        syncCapturePermissions()
         guard UserDefaults.standard.bool(forKey: DefaultsKey.mcpEnabled) else {
             generation &+= 1
             server?.stop()
@@ -28,6 +29,31 @@ final class MCPControl: ObservableObject {
             guard self?.generation == currentGeneration,
                   UserDefaults.standard.bool(forKey: DefaultsKey.mcpEnabled) else {
                 return MCPIPCResponse(ok: false, error: "disabled")
+            }
+            if !request.command.hasPrefix("recording_"),
+               request.systemAudio != nil || request.microphone != nil {
+                return MCPIPCResponse(ok: false, error: "invalid_arguments")
+            }
+            if request.command.hasPrefix("capture_") {
+                guard UserDefaults.standard.bool(forKey: DefaultsKey.mcpCaptureEnabled) else {
+                    return MCPIPCResponse(ok: false, error: "capture_disabled")
+                }
+                if request.command == "capture_read",
+                   !UserDefaults.standard.bool(forKey: DefaultsKey.mcpCaptureContentEnabled) {
+                    return MCPIPCResponse(ok: false, error: "capture_content_disabled")
+                }
+                return MCPCaptureAdapter.shared.execute(request) ?? MCPIPCResponse(ok: false, error: "invalid_command")
+            }
+            if request.command.hasPrefix("recording_") {
+                guard UserDefaults.standard.bool(forKey: DefaultsKey.mcpCaptureEnabled),
+                      UserDefaults.standard.bool(forKey: DefaultsKey.mcpRecordingEnabled) else {
+                    return MCPIPCResponse(ok: false, error: "recording_disabled")
+                }
+                if ["recording_share", "recording_read"].contains(request.command),
+                   !UserDefaults.standard.bool(forKey: DefaultsKey.mcpCaptureContentEnabled) {
+                    return MCPIPCResponse(ok: false, error: "capture_content_disabled")
+                }
+                return MCPRecordingAdapter.shared.execute(request) ?? MCPIPCResponse(ok: false, error: "invalid_command")
             }
             if request.command.hasPrefix("audio_") {
                 guard UserDefaults.standard.bool(forKey: DefaultsKey.mcpAudioEnabled) else {
@@ -81,5 +107,13 @@ final class MCPControl: ObservableObject {
         generation &+= 1
         server?.stop()
         server = nil
+        MCPCaptureAdapter.shared.clear()
+        MCPRecordingAdapter.shared.stopOwnedCapture()
+    }
+
+    func syncCapturePermissions() {
+        precondition(Thread.isMainThread)
+        MCPCaptureAdapter.shared.syncWithPermissions()
+        MCPRecordingAdapter.shared.syncWithPermissions()
     }
 }

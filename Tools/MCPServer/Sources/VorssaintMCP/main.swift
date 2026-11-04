@@ -4,7 +4,7 @@
 import Foundation
 import MCP
 
-let server = Server(name: "Vorssaint", version: "0.1.0", capabilities: .init(tools: .init(listChanged: false)))
+let server = Server(name: "Vorssaint", version: "0.1.0", capabilities: .init(resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false)))
 let emptySchema: Value = .object([
     "type": .string("object"), "properties": .object([:]), "additionalProperties": .bool(false)
 ])
@@ -19,8 +19,63 @@ func numberSchema(_ maximum: Int) -> Value {
 }
 let boolSchema: Value = .object(["type": .string("boolean")])
 let offsetSchema: Value = .object(["type": .string("integer"), "minimum": .int(0), "maximum": .int(1_000_000)])
+let captureModeSchema: Value = .object(["type": .string("string"), "enum": .array(["screenshot", "text", "qr"].map(Value.string))])
 let windowActions = MCPDisplayWindowPolicy.windowActions.sorted()
 let windowActionSchema: Value = .object(["type": .string("string"), "enum": .array(windowActions.map(Value.string))])
+
+/// Read only a user-approved, bounded result through the app's one-shot IPC.
+/// Every chunk is reauthorized by the running app; do not write it to disk.
+private struct ApprovedReadError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+func readApprovedBytes(id: String, command: String, maxBytes: Int, acceptedTypes: Set<String>) throws -> (Data, String) {
+    let deadline = DispatchTime.now().uptimeNanoseconds + 60_000_000_000
+    var data = Data()
+    var expectedTotal: Int?
+    var mimeType: String?
+    while true {
+        guard !Task.isCancelled, DispatchTime.now().uptimeNanoseconds < deadline else {
+            throw MCPIPCError.unavailable
+        }
+        let response = try MCPIPCClient.call(MCPIPCRequest(command: command, id: id, offset: data.count))
+        guard response.ok else {
+            throw ApprovedReadError(message: response.error ?? "Result is unavailable")
+        }
+        guard let payload = response.payload?.data(using: .utf8),
+              let fields = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
+              fields["id"] as? String == id,
+              let offset = fields["offset"] as? Int, offset == data.count,
+              let total = fields["total_bytes"] as? Int, (0...maxBytes).contains(total),
+              let mime = fields["mime_type"] as? String,
+              acceptedTypes.contains(mime),
+              let encoded = fields["data_base64"] as? String,
+              let chunk = Data(base64Encoded: encoded), chunk.count <= 6144,
+              let complete = fields["complete"] as? Bool,
+              (expectedTotal == nil || expectedTotal == total), (mimeType == nil || mimeType == mime),
+              data.count + chunk.count <= total else { throw MCPIPCError.invalidMessage }
+        expectedTotal = total; mimeType = mime
+        data.append(chunk)
+        if complete {
+            guard data.count == total else { throw MCPIPCError.invalidMessage }
+            return (data, mime)
+        }
+        guard !chunk.isEmpty, data.count < total, fields["next_offset"] as? Int == data.count else {
+            throw MCPIPCError.invalidMessage
+        }
+    }
+}
+
+func readCapture(id: String) throws -> CallTool.Result {
+    let (data, mime) = try readApprovedBytes(id: id, command: "capture_read", maxBytes: 8 * 1024 * 1024,
+                                              acceptedTypes: ["image/png", "text/plain; charset=utf-8"])
+    if mime == "image/png" {
+        return .init(content: [.image(data: data.base64EncodedString(), mimeType: mime, metadata: nil)], isError: false)
+    }
+    guard let text = String(data: data, encoding: .utf8) else { throw MCPIPCError.invalidMessage }
+    return .init(content: [.text(text)], isError: false)
+}
 await server.withMethodHandler(ListTools.self) { _ in
     .init(tools: [
         Tool(name: "keep_awake_status", description: "Get the current Keep Awake state in Vorssaint.", inputSchema: emptySchema,
@@ -51,6 +106,24 @@ await server.withMethodHandler(ListTools.self) { _ in
         Tool(name: "window_active", description: "Identify the frontmost application for a window layout action. Requires Window access and macOS Accessibility permission.", inputSchema: emptySchema,
              annotations: .init(readOnlyHint: true, openWorldHint: false)),
         Tool(name: "window_layout", description: "Apply a layout to the currently focused window, only if its frontmost application's PID matches the ID returned by window_active. Focus can still change between windows of that application. Moving displays and restore are not idempotent.", inputSchema: schema(["id": stringSchema, "action": windowActionSchema], required: ["id", "action"]),
+             annotations: .init(destructiveHint: false, idempotentHint: false, openWorldHint: false)),
+        Tool(name: "capture_start", description: "Ask the user to select a screen area for a screenshot, OCR, or QR. The user must separately approve transferring the unedited result. Requires Screen Capture and Share Capture Results in MCP settings and macOS Screen Recording access. Poll capture_status with the returned ID.", inputSchema: schema(["mode": captureModeSchema], required: ["mode"]),
+             annotations: .init(destructiveHint: false, idempotentHint: false, openWorldHint: false)),
+        Tool(name: "capture_status", description: "Get the state of this capture request by ID: selecting, awaitingApproval, processing, ready, denied, cancelled, or failed.", inputSchema: schema(["id": stringSchema], required: ["id"]),
+             annotations: .init(readOnlyHint: true, openWorldHint: false)),
+        Tool(name: "capture_read", description: "Retrieve the explicitly user-approved result once, by capture ID. Returns a PNG image or recognized text; results expire and are cleared after retrieval.", inputSchema: schema(["id": stringSchema], required: ["id"]),
+             annotations: .init(destructiveHint: false, idempotentHint: false, openWorldHint: false)),
+        Tool(name: "capture_discard", description: "Cancel and discard this capture request and its in-memory result by ID.", inputSchema: schema(["id": stringSchema], required: ["id"]),
+             annotations: .init(destructiveHint: false, idempotentHint: true, openWorldHint: false)),
+        Tool(name: "recording_start", description: "Ask the user to select a recording area. Audio defaults to off; system_audio and microphone set the initial visible choices. Does not stop an existing recording. Returns a request ID.", inputSchema: schema(["system_audio": boolSchema, "microphone": boolSchema], required: []),
+             annotations: .init(destructiveHint: false, idempotentHint: false, openWorldHint: false)),
+        Tool(name: "recording_status", description: "Read the status of a recording started by this MCP integration, including whether a user-exported result has been approved for sharing. When export_state is ready, use resources/read with vorssaint://recording/<id>.", inputSchema: schema(["id": stringSchema], required: ["id"]),
+             annotations: .init(readOnlyHint: true, openWorldHint: false)),
+        Tool(name: "recording_stop", description: "Stop only the recording associated with this request ID; the app finalizes it using its normal editor or save workflow.", inputSchema: schema(["id": stringSchema], required: ["id"]),
+             annotations: .init(destructiveHint: false, idempotentHint: true, openWorldHint: false)),
+        Tool(name: "recording_set_paused", description: "Pause or resume only the recording associated with this request ID.", inputSchema: schema(["id": stringSchema, "paused": boolSchema], required: ["id", "paused"]),
+             annotations: .init(destructiveHint: false, idempotentHint: true, openWorldHint: false)),
+        Tool(name: "recording_share", description: "Ask the user to approve sharing the already saved or exported recording for this request. A direct save may contain the unedited recording. Poll recording_status; when ready read the one-shot MCP resource vorssaint://recording/<id>.", inputSchema: schema(["id": stringSchema], required: ["id"]),
              annotations: .init(destructiveHint: false, idempotentHint: false, openWorldHint: false))
     ])
 }
@@ -123,10 +196,44 @@ await server.withMethodHandler(CallTool.self) { params in
             return .init(content: [.text("Invalid window ID or action")], isError: true)
         }
         request = MCPIPCRequest(command: params.name, id: id, action: action)
+    case "capture_start":
+        guard Set(arguments.keys) == ["mode"], let mode = arguments["mode"]?.stringValue,
+              ["screenshot", "text", "qr"].contains(mode) else {
+            return .init(content: [.text("Invalid capture mode")], isError: true)
+        }
+        request = MCPIPCRequest(command: params.name, action: mode)
+    case "capture_status", "capture_read", "capture_discard", "recording_status", "recording_stop", "recording_share":
+        guard Set(arguments.keys) == ["id"], let id = arguments["id"]?.stringValue,
+              UUID(uuidString: id) != nil else {
+            return .init(content: [.text("A valid request ID is required")], isError: true)
+        }
+        request = MCPIPCRequest(command: params.name, id: id)
+    case "recording_start":
+        let keys = Set(arguments.keys)
+        guard keys.isSubset(of: ["system_audio", "microphone"]),
+              (arguments["system_audio"] == nil || arguments["system_audio"]?.boolValue != nil),
+              (arguments["microphone"] == nil || arguments["microphone"]?.boolValue != nil) else {
+            return .init(content: [.text("Audio choices must be booleans")], isError: true)
+        }
+        request = MCPIPCRequest(command: params.name,
+                                systemAudio: arguments["system_audio"]?.boolValue,
+                                microphone: arguments["microphone"]?.boolValue)
+    case "recording_set_paused":
+        guard Set(arguments.keys) == ["id", "paused"], let id = arguments["id"]?.stringValue,
+              UUID(uuidString: id) != nil, let paused = arguments["paused"]?.boolValue else {
+            return .init(content: [.text("A valid request ID and paused boolean are required")], isError: true)
+        }
+        request = MCPIPCRequest(command: params.name, id: id, action: paused ? "pause" : "resume")
     default:
         return .init(content: [.text("Unknown tool or invalid arguments")], isError: true)
     }
     do {
+        if params.name == "capture_read", let id = request.id {
+            do { return try readCapture(id: id) }
+            catch let error as ApprovedReadError {
+                return .init(content: [.text(error.message)], isError: true)
+            }
+        }
         let response = try MCPIPCClient.call(request)
         let encoded = try JSONEncoder().encode(response)
         guard var object = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
@@ -139,6 +246,30 @@ await server.withMethodHandler(CallTool.self) { params in
         return .init(content: [.text(String(decoding: data, as: UTF8.self))], isError: !response.ok)
     } catch {
         return .init(content: [.text("Vorssaint MCP control is unavailable. Open Vorssaint and enable MCP control in settings.")], isError: true)
+    }
+}
+await server.withMethodHandler(ListResources.self) { _ in
+    // Exported results are private, per-request and not enumerable.
+    .init(resources: [])
+}
+await server.withMethodHandler(ListResourceTemplates.self) { _ in
+    .init(templates: [.init(uriTemplate: "vorssaint://recording/{id}", name: "Approved recording export",
+                            description: "One-shot user-approved, saved recording. Request sharing and wait for approval first.")])
+}
+await server.withMethodHandler(ReadResource.self) { params in
+    let prefix = "vorssaint://recording/"
+    guard params.uri.hasPrefix(prefix) else { throw MCPError.invalidParams("Unknown resource") }
+    let rawID = String(params.uri.dropFirst(prefix.count))
+    guard let recordingID = UUID(uuidString: rawID) else { throw MCPError.invalidParams("Invalid recording ID") }
+    let id = recordingID.uuidString
+    do {
+        let (data, mime) = try readApprovedBytes(id: id, command: "recording_read", maxBytes: 32 * 1024 * 1024,
+                                                  acceptedTypes: ["video/quicktime", "video/mp4", "image/gif"])
+        return .init(contents: [.binary(data, uri: params.uri, mimeType: mime)])
+    } catch let error as ApprovedReadError {
+        throw MCPError.invalidRequest(error.message)
+    } catch {
+        throw MCPError.internalError("Could not read approved recording")
     }
 }
 try await server.start(transport: StdioTransport())

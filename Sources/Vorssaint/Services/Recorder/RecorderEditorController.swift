@@ -1417,6 +1417,9 @@ final class RecorderEditorModel: ObservableObject, BackdropEditing {
 /// and the work in the middle.
 final class RecorderEditorController: NSObject, NSWindowDelegate {
     private let model: RecorderEditorModel
+    /// Used only by a recording explicitly started through MCP. Called after
+    /// a user-initiated export has successfully finished.
+    var onExportedForMCP: ((URL) -> Void)?
     private var window: NSWindow?
     private var keyMonitor: Any?
     /// True once at least one file has been written from this recording. A
@@ -1643,6 +1646,7 @@ final class RecorderEditorController: NSObject, NSWindowDelegate {
                 // who just made a video often wants the GIF of it too.
                 self.exported = true
                 RecentCaptureService.shared.recordRecording(at: destination)
+                self.onExportedForMCP?(destination)
                 if let onSuccess {
                     onSuccess(destination)
                 } else {

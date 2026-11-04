@@ -14,18 +14,20 @@ final class ScreenCaptureSelectionOptions: ObservableObject {
     var onPresentationReady: (() -> Void)?
     var onSelectionProgressChange: ((Bool) -> Void)?
     var onCaptureControlsSurfaceChange: ((CGRect, CGFloat) -> Void)?
-    let recorderAudio = RecorderSelectionAudioOptions()
+    let recorderAudio: RecorderSelectionAudioOptions
     @Published private(set) var selectedTool: ScreenCaptureTool
     @Published var offersRepeatLastRegion = false
     var onSelectionChange: (() -> Void)?
 
     init(availableTools: [ScreenCaptureTool], selectedTool: ScreenCaptureTool,
-         showsCaptureMenu: Bool, controlsInNotch: Bool = false) {
+         showsCaptureMenu: Bool, controlsInNotch: Bool = false,
+         recorderAudio: RecorderSelectionAudioOptions? = nil) {
         precondition(availableTools.contains(selectedTool))
         self.availableTools = availableTools
         self.selectedTool = selectedTool
         self.showsCaptureMenu = showsCaptureMenu
         self.controlsInNotch = controlsInNotch
+        self.recorderAudio = recorderAudio ?? RecorderSelectionAudioOptions()
     }
 
     func select(_ tool: ScreenCaptureTool) {

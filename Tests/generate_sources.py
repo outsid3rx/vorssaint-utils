@@ -2514,6 +2514,14 @@ def main():
           + declaration(service, "final class QuitProtectionService:")
           + "}\n" + f'#sourceLocation(file: {json.dumps(checks)}, line: 1)\n'
           + (ROOT / checks).read_text() + "\n#sourceLocation()\n")
+    recording = "Sources/Vorssaint/Services/MCP/MCPRecordingAdapter.swift"
+    write("MCPRecordingExportBodies.swift", "import AppKit\nimport Darwin\nimport Foundation\n"
+          + "extension MCPRecordingExportTests.Fixture {\n"
+          + "".join(declaration(recording, prefix).replace("private func", "func", 1)
+                    for prefix in ["    func recordingDidExport(", "    private func readExport(",
+                                   "    private func clearExport(", "    private func expireExportIfNeeded(",
+                                   "    private func encode("])
+          + "}\n")
     hud = "Sources/Vorssaint/UI/QuitProtection/QuitProtectionHUD.swift"
     checks = "Tests/Fixtures/QuitProtectionHUDChecks.swift"
     write("QuitProtectionHUDBodies.swift",

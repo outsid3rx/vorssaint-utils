@@ -548,6 +548,8 @@ if (( TEST )); then
         Sources/Vorssaint/Services/MCP/MCPKeepAwakeSupport.swift
         Sources/Vorssaint/Services/MCP/MCPAudioPolicy.swift
         Sources/Vorssaint/Services/MCP/MCPDisplayWindowSupport.swift
+        Sources/Vorssaint/Services/MCP/MCPCapturePolicy.swift
+        Sources/Vorssaint/Services/MCP/MCPRecordingPolicy.swift
         Sources/Vorssaint/Services/SudoersSupport.swift
         Sources/Vorssaint/Services/Metrics/BatteryTimeSupport.swift
         Sources/Vorssaint/Services/Metrics/BatteryPowerSupport.swift
@@ -605,6 +607,7 @@ if (( TEST )); then
         ./Tests/DeveloperInstallIsolationTests.sh || test_status=1
         ./Tools/MCPServer/test-ipc.sh || test_status=1
         ./Tools/MCPServer/test-audio.sh || test_status=1
+        ./Tools/MCPServer/test-stdio.sh || test_status=1
     fi
     discard_test_preferences || test_status=1
     exit $test_status

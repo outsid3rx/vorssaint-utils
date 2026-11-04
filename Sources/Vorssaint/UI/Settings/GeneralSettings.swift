@@ -22,6 +22,9 @@ struct GeneralSettings: View {
     @AppStorage(DefaultsKey.mcpAudioEnabled) private var mcpAudioEnabled = false
     @AppStorage(DefaultsKey.mcpDisplayEnabled) private var mcpDisplayEnabled = false
     @AppStorage(DefaultsKey.mcpWindowEnabled) private var mcpWindowEnabled = false
+    @AppStorage(DefaultsKey.mcpCaptureEnabled) private var mcpCaptureEnabled = false
+    @AppStorage(DefaultsKey.mcpCaptureContentEnabled) private var mcpCaptureContentEnabled = false
+    @AppStorage(DefaultsKey.mcpRecordingEnabled) private var mcpRecordingEnabled = false
 
     private var text: GeneralSettingsStrings { FeatureStrings.generalSettings(l10n.language) }
     private var appearanceStrings: AppearanceStrings { FeatureStrings.appearance(l10n.language) }
@@ -62,6 +65,14 @@ struct GeneralSettings: View {
                 Toggle(mcpCategoryLabels.0, isOn: $mcpAudioEnabled)
                 Toggle(mcpCategoryLabels.1, isOn: $mcpDisplayEnabled)
                 Toggle(mcpCategoryLabels.2, isOn: $mcpWindowEnabled)
+                Toggle(mcpCaptureLabels.0, isOn: $mcpCaptureEnabled)
+                    .onChange(of: mcpCaptureEnabled) { _, _ in MCPControl.shared.syncCapturePermissions() }
+                Toggle(mcpCaptureLabels.1, isOn: $mcpCaptureContentEnabled)
+                    .disabled(!mcpCaptureEnabled)
+                    .onChange(of: mcpCaptureContentEnabled) { _, _ in MCPControl.shared.syncCapturePermissions() }
+                Toggle(mcpCaptureLabels.2, isOn: $mcpRecordingEnabled)
+                    .disabled(!mcpCaptureEnabled)
+                    .onChange(of: mcpRecordingEnabled) { _, _ in MCPControl.shared.syncCapturePermissions() }
             }
             .toggleStyle(TrailingSwitchToggleStyle())
             .disabled(!mcpEnabled)
@@ -69,6 +80,26 @@ struct GeneralSettings: View {
             if let error = mcp.lastError {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
+        }
+    }
+
+    private var mcpCaptureLabels: (String, String, String) {
+        switch l10n.language {
+        case .enUS: return ("Screen capture selection", "Share selected capture results", "Screen recording control")
+        case .ru: return ("Выбор области захвата", "Передача выбранного результата", "Управление записью экрана")
+        case .uk: return ("Вибір області захоплення", "Передача вибраного результату", "Керування записом екрана")
+        case .ptBR: return ("Seleção de captura de tela", "Compartilhar resultados selecionados", "Controle de gravação de tela")
+        case .tr: return ("Ekran yakalama seçimi", "Seçilen yakalamaları paylaş", "Ekran kaydı kontrolü")
+        case .es: return ("Selección de captura de pantalla", "Compartir capturas seleccionadas", "Control de grabación de pantalla")
+        case .sk: return ("Výber snímania obrazovky", "Zdieľanie vybraných výsledkov", "Ovládanie záznamu obrazovky")
+        case .de: return ("Bildschirmaufnahme auswählen", "Ausgewählte Aufnahmen teilen", "Bildschirmaufzeichnung steuern")
+        case .fr: return ("Sélection de capture d’écran", "Partager les captures sélectionnées", "Contrôle de l’enregistrement d’écran")
+        case .it: return ("Selezione cattura schermo", "Condividi catture selezionate", "Controllo registrazione schermo")
+        case .ja: return ("画面キャプチャの選択", "選択したキャプチャ結果を共有", "画面収録の制御")
+        case .ko: return ("화면 캡처 선택", "선택한 캡처 결과 공유", "화면 녹화 제어")
+        case .zhHans: return ("选择屏幕捕获区域", "共享选定的捕获结果", "控制屏幕录制")
+        case .zhTW: return ("選取螢幕擷取區域", "分享選取的擷取結果", "控制螢幕錄影")
+        case .zhHK: return ("選取螢幕擷取區域", "分享選取的擷取結果", "控制螢幕錄影")
         }
     }
 

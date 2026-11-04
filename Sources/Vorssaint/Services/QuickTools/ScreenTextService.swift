@@ -98,7 +98,7 @@ final class ScreenTextService: ObservableObject {
     /// capture in a screenshot preview or a large area on an 8K display.
     /// Past the bound the clipboard history's Copy text uses, either is
     /// scaled down here, off the main thread, before Vision reads it.
-    private static func recognitionImage(_ image: CGImage) -> CGImage {
+    static func recognitionImage(_ image: CGImage) -> CGImage {
         guard let size = ClipboardImageRecognition.scaledSize(width: image.width, height: image.height),
               let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(data: nil,

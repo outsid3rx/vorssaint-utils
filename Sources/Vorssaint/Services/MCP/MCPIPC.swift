@@ -13,10 +13,14 @@ struct MCPIPCRequest: Codable, Sendable {
     let muted: Bool?
     let offset: Int?
     let outputOffset: Int?
+    let systemAudio: Bool?
+    let microphone: Bool?
     init(command: String, minutes: Int? = nil, id: String? = nil, value: Double? = nil,
-         action: String? = nil, muted: Bool? = nil, offset: Int? = nil, outputOffset: Int? = nil) {
+         action: String? = nil, muted: Bool? = nil, offset: Int? = nil, outputOffset: Int? = nil,
+         systemAudio: Bool? = nil, microphone: Bool? = nil) {
         self.command = command; self.minutes = minutes; self.id = id; self.value = value
         self.action = action; self.muted = muted; self.offset = offset; self.outputOffset = outputOffset
+        self.systemAudio = systemAudio; self.microphone = microphone
     }
 }
 

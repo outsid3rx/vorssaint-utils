@@ -232,6 +232,9 @@ struct MetricsTests {
             }),
             ("mcp-controls", {
                 MCPDisplayWindowTests.run(suite)
+                MCPCapturePolicyTests.run(suite)
+                MCPRecordingPolicyTests.run(suite)
+                MCPRecordingExportTests.run(suite)
             }),
             ("wallpaper", {
                 WallpaperContract.run(suite)

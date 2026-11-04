@@ -7,7 +7,8 @@ enum MCPKeepAwakeTests {
     static func run(_ suite: TestSuite) {
         suite.expect(!SettingsBackupSupport.exportKeys().contains(DefaultsKey.mcpEnabled),
                      "local MCP authorization is not exported to another Mac")
-        for key in [DefaultsKey.mcpAudioEnabled, DefaultsKey.mcpDisplayEnabled, DefaultsKey.mcpWindowEnabled] {
+        for key in [DefaultsKey.mcpAudioEnabled, DefaultsKey.mcpDisplayEnabled, DefaultsKey.mcpWindowEnabled,
+                    DefaultsKey.mcpCaptureEnabled, DefaultsKey.mcpCaptureContentEnabled, DefaultsKey.mcpRecordingEnabled] {
             suite.expect(!SettingsBackupSupport.exportKeys().contains(key), "MCP category authorization is local")
             suite.expect(Defaults.registeredDefaults[key] as? Bool == false, "MCP category is disabled by default")
         }

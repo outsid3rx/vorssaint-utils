@@ -1,8 +1,9 @@
 # Local MCP control
 
-Vorssaint can expose Keep Awake and, optionally, sound, displays and window
-layout to a local MCP client. In General settings, enable **MCP** and keep
-Vorssaint running. Sound, displays and windows each have a separate opt-in,
+Vorssaint can expose Keep Awake and, optionally, sound, displays, window layout
+and interactive screen capture to a local MCP client. In General settings,
+enable **MCP** and keep Vorssaint running. Sound, displays, windows, screen
+capture, sharing capture results and recording each have a separate opt-in,
 also off by default. These choices are not transferred in settings backups.
 Enabling them permits processes running as the same macOS user to access the
 allowed controls; the socket does not authenticate individual agents. Only
@@ -64,6 +65,34 @@ Audio and brightness actions report a queued/requested change, not a hardware
 confirmation. A window layout result reports the initial application; a later
 settling attempt can still fail. Use the app UI or a subsequent status read to
 inspect the result, noting that some reported values are optimistic.
+
+For screen content, `capture_start` opens a selection for `screenshot`, `text`
+or `qr`. The user chooses an area or window and separately confirms transfer of
+the unedited image or recognized text to the MCP client. `capture_status` reports
+progress; `capture_read` returns the approved result once as an MCP image or
+text, and `capture_discard` cancels it. Both screen capture and result sharing
+must be enabled in MCP settings, the corresponding Vorssaint feature must be
+installed, and macOS Screen Recording access must already be granted. A result
+over 8 MiB is rejected; unclaimed results expire after 120 seconds. Captures
+are not put in the clipboard, automatically uploaded or saved to a file.
+
+`recording_start` opens a visible recording selector, with system audio and
+microphone initially off unless explicitly requested; the user can change
+these choices in the selector. The tools `recording_status`, `recording_stop`
+and `recording_set_paused` operate only on the request's own recording. Screen
+Recording and Accessibility must already be granted, and the microphone must
+already be authorized if selected. Normal app recording and editing remain in
+control of the user.
+
+Once the user saves or exports that recording, `recording_share` asks for
+separate permission to transfer the saved file to the MCP client. When direct
+save is enabled, that file may contain the unedited recording. Poll
+`recording_status` until `export_state` is `ready`, then read the one-shot MCP
+resource `vorssaint://recording/<request_id>`. The file must be MOV, MP4 or GIF,
+at most 32 MiB, and unchanged during transfer; the permission expires after
+120 seconds. Sharing must already be enabled when the file is exported, or the
+user must export it again after enabling it. A client may send shared content
+to its AI provider. No arbitrary file path or unsaved editor master is exposed.
 
 The app rejects requests that exceed its processing deadline before execution.
 If a connection breaks or the client times out before receiving a response,
