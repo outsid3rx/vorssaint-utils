@@ -996,8 +996,12 @@ def main():
           + "func selectOutput(_ device: AudioObjectID?, volume: Double?, muted: Bool?) {\n"
           + "removeOutputControlListeners(); outputControlListenerDevice = device; applyOutputControls(volume: volume, muted: muted)\n}\n"
           + "func readSnapshot(volume: Double?, muted: Bool?) { applyOutputControls(volume: volume, muted: muted) }\n"
-          + "".join(declaration(mixer, prefix) for prefix in [
-              "    func requestOutputAdjustment(", "    private func enqueueOutputAdjustment(", "    private func removeOutputControlListeners(",
+          + "".join(declaration(mixer, prefix).replace(
+                    "    func requestOutputAdjustment(", "    @discardableResult\n    func requestOutputAdjustment(", 1)
+                    if prefix == "    func requestOutputAdjustment(" else declaration(mixer, prefix)
+                    for prefix in [
+              "    func requestOutputAdjustment(", "    private func canEnqueueOutputAdjustment(",
+              "    private func enqueueOutputAdjustment(", "    private func removeOutputControlListeners(",
               "    func requestOutputStep(", "    func requestOutputMuteToggle(",
               "    private func enqueueOutputKey(", "    private func readOutputForQueuedKeys(",
               "    private func settleQueuedOutputSteps(",
@@ -2510,6 +2514,14 @@ def main():
           + declaration(service, "final class QuitProtectionService:")
           + "}\n" + f'#sourceLocation(file: {json.dumps(checks)}, line: 1)\n'
           + (ROOT / checks).read_text() + "\n#sourceLocation()\n")
+    recording = "Sources/Vorssaint/Services/MCP/MCPRecordingAdapter.swift"
+    write("MCPRecordingExportBodies.swift", "import AppKit\nimport Darwin\nimport Foundation\n"
+          + "extension MCPRecordingExportTests.Fixture {\n"
+          + "".join(declaration(recording, prefix).replace("private func", "func", 1)
+                    for prefix in ["    func recordingDidExport(", "    private func readExport(",
+                                   "    private func clearExport(", "    private func expireExportIfNeeded(",
+                                   "    private func encode("])
+          + "}\n")
     hud = "Sources/Vorssaint/UI/QuitProtection/QuitProtectionHUD.swift"
     checks = "Tests/Fixtures/QuitProtectionHUDChecks.swift"
     write("QuitProtectionHUDBodies.swift",

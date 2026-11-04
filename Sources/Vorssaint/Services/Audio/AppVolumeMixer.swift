@@ -535,18 +535,32 @@ final class AppVolumeMixer: ObservableObject {
     /// UI feedback is immediate; one HAL write runs at a time and a burst
     /// retains only its newest requested level. Device changes never inherit
     /// a write intended for the previous output.
+    @discardableResult
     func requestOutputAdjustment(volume: Double? = nil, muted: Bool? = nil,
-                                 completion: @escaping (Bool) -> Void = { _ in }) {
+                                 completion: @escaping (Bool) -> Void = { _ in }) -> Bool {
+        // Synchronous queue admission is distinct from the later asynchronous
+        // hardware confirmation delivered through completion.
+        guard canEnqueueOutputAdjustment(volume: volume, muted: muted) else {
+            completion(false)
+            return false
+        }
         enqueueOutputAdjustment(volume: volume, muted: muted) { completion($0.handled) }
+        return true
+    }
+
+    private func canEnqueueOutputAdjustment(volume: Double?, muted: Bool?) -> Bool {
+        outputControlListenerDevice != nil && volume?.isFinite != false
+            && (volume == nil || systemOutputVolume != nil)
+            && (muted == nil || systemOutputMuted != nil)
     }
 
     private func enqueueOutputAdjustment(volume: Double? = nil, muted: Bool? = nil,
                                          step: OutputStep? = nil,
                                          completion: @escaping (OutputKeyResult) -> Void) {
         guard let device = outputControlListenerDevice,
-              volume?.isFinite != false,
-              volume == nil || systemOutputVolume != nil,
-              muted == nil || systemOutputMuted != nil else { completion(.fallback); return }
+              canEnqueueOutputAdjustment(volume: volume, muted: muted) else {
+            completion(.fallback); return
+        }
         // A direct control change supersedes keys pressed before it. The HAL
         // read for those keys may still finish later, so invalidate its value.
         if step == nil {

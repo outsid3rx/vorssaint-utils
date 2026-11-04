@@ -8,16 +8,25 @@ import CoreMedia
 /// The two choices shown while the area is being picked. They write through to
 /// preferences immediately, so the selection and Settings always start alike.
 final class RecorderSelectionAudioOptions: ObservableObject {
+    private let persistsChoices: Bool
     @Published var systemAudio: Bool {
-        didSet { UserDefaults.standard.set(systemAudio, forKey: DefaultsKey.recorderSystemAudio) }
+        didSet { if persistsChoices { UserDefaults.standard.set(systemAudio, forKey: DefaultsKey.recorderSystemAudio) } }
     }
     @Published var microphone: Bool {
-        didSet { UserDefaults.standard.set(microphone, forKey: DefaultsKey.recorderMicrophone) }
+        didSet { if persistsChoices { UserDefaults.standard.set(microphone, forKey: DefaultsKey.recorderMicrophone) } }
     }
 
     init(defaults: UserDefaults = .standard) {
+        persistsChoices = true
         systemAudio = defaults.bool(forKey: DefaultsKey.recorderSystemAudio)
         microphone = defaults.bool(forKey: DefaultsKey.recorderMicrophone)
+    }
+
+    /// MCP chooser starts with explicit choices and never rewrites saved defaults.
+    init(systemAudio: Bool, microphone: Bool) {
+        persistsChoices = false
+        self.systemAudio = systemAudio
+        self.microphone = microphone
     }
 }
 
@@ -276,6 +285,11 @@ final class ScreenRecorderService: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var isPaused = false
     @Published private(set) var elapsedSeconds = 0
+    /// Identifies only the recording explicitly started by the MCP chooser.
+    private(set) var mcpRecordingID: UUID?
+    private(set) var mcpOutcome: String?
+    private var mcpAudioOptions: (systemAudio: Bool, microphone: Bool)?
+    var mcpIsFinishing: Bool { isFinishing }
     private var session: RecorderSession?
     private var indicator: RecorderIndicator?
     private var editors: [RecorderEditorController] = []
@@ -330,10 +344,14 @@ final class ScreenRecorderService: ObservableObject {
 
     @discardableResult
     func openEditor(with take: RecorderTakeStore.Take,
-                    owner: AppFeature = .screenRecorder) -> Bool {
+                    owner: AppFeature = .screenRecorder,
+                    mcpOwnerID: UUID? = nil) -> Bool {
         guard owner.isAvailable else { return false }
         WindowActivationPolicy.retain()
         let editor = RecorderEditorController(take: take)
+        if let mcpOwnerID {
+            editor.onExportedForMCP = { url in MCPRecordingAdapter.shared.recordingDidExport(id: mcpOwnerID, url: url) }
+        }
         editors.append(editor)
         if owner == .mediaTools { mediaOwnedEditorIDs.insert(ObjectIdentifier(editor)) }
         editor.show()
@@ -402,9 +420,17 @@ final class ScreenRecorderService: ObservableObject {
         return true
     }
 
+    @discardableResult
     func record(_ region: RecorderSupport.Region,
-                audioOptions: RecorderSelectionAudioOptions) {
-        guard prepareForSelection() else { return }
+                audioOptions: RecorderSelectionAudioOptions,
+                mcpOwnerID: UUID? = nil) -> Bool {
+        guard prepareForSelection() else { return false }
+        if let previous = mcpRecordingID, let outcome = mcpOutcome {
+            MCPRecordingAdapter.shared.recordingDidFinish(id: previous, outcome: outcome)
+        }
+        mcpRecordingID = mcpOwnerID
+        mcpOutcome = nil
+        mcpAudioOptions = mcpOwnerID.map { _ in (audioOptions.systemAudio, audioOptions.microphone) }
         let indicator = RecorderIndicator(
             onPause: { [weak self] in self?.togglePause() },
             onStop: { [weak self] in self?.stop() })
@@ -414,6 +440,7 @@ final class ScreenRecorderService: ObservableObject {
         let generation = pendingStartGeneration
         prepareCountdown(for: region, wantsMicrophone: audioOptions.microphone,
                          generation: generation)
+        return true
     }
 
     private func prepareCountdown(for region: RecorderSupport.Region,
@@ -480,6 +507,7 @@ final class ScreenRecorderService: ObservableObject {
     private func beginRecording(region: RecorderSupport.Region, generation: Int) {
         guard pendingStartIsAuthorized(generation), session == nil,
               !isFinishing, let take = RecorderTakeStore.shared.makeTake() else {
+            if mcpRecordingID != nil { mcpOutcome = "failed" }
             indicator?.hide()
             indicator = nil
             QuickToolHUD.show(icon: "record.circle", message: strings.recordFailed)
@@ -488,8 +516,8 @@ final class ScreenRecorderService: ObservableObject {
         let defaults = UserDefaults.standard
         let frameRate = RecorderSupport.sanitizedFrameRate(
             defaults.integer(forKey: DefaultsKey.recorderFrameRate))
-        let capturesSystemAudio = defaults.bool(forKey: DefaultsKey.recorderSystemAudio)
-        let capturesMicrophone = defaults.bool(forKey: DefaultsKey.recorderMicrophone)
+        let capturesSystemAudio = mcpAudioOptions?.systemAudio ?? defaults.bool(forKey: DefaultsKey.recorderSystemAudio)
+        let capturesMicrophone = (mcpAudioOptions?.microphone ?? defaults.bool(forKey: DefaultsKey.recorderMicrophone))
             && Permissions.shared.microphone == .granted
         let pauseClock = RecorderPauseClock()
         isPreparingRecording = true
@@ -504,6 +532,7 @@ final class ScreenRecorderService: ObservableObject {
             }
             self.isPreparingRecording = false
             guard let writer else {
+                if self.mcpRecordingID != nil { self.mcpOutcome = "failed" }
                 self.indicator?.hide()
                 self.indicator = nil
                 RecorderTakeStore.shared.delete(take)
@@ -570,6 +599,7 @@ final class ScreenRecorderService: ObservableObject {
             guard self.session === session, !self.isFinishing,
                   self.pendingStartIsAuthorized(generation) else { return }
             if let failure {
+                if self.mcpRecordingID != nil { self.mcpOutcome = "failed" }
                 self.session = nil
                 self.indicator?.hide()
                 self.indicator = nil
@@ -589,6 +619,7 @@ final class ScreenRecorderService: ObservableObject {
     }
 
     private func invalidatePendingStart() {
+        if mcpRecordingID != nil && mcpOutcome == nil && !isFinishing && session == nil { mcpOutcome = "cancelled" }
         pendingStartGeneration &+= 1
         isAwaitingMicrophone = false
         isPreparingRecording = false
@@ -679,8 +710,16 @@ final class ScreenRecorderService: ObservableObject {
             self.session = nil
             self.isFinishing = false
             if written {
+                if let id = self.mcpRecordingID {
+                    self.mcpOutcome = "completed"
+                    MCPRecordingAdapter.shared.recordingDidFinish(id: id, outcome: "completed")
+                }
                 self.deliver(session.take, reason: reason)
             } else {
+                if let id = self.mcpRecordingID {
+                    self.mcpOutcome = "failed"
+                    MCPRecordingAdapter.shared.recordingDidFinish(id: id, outcome: "failed")
+                }
                 RecorderTakeStore.shared.delete(session.take)
                 QuickToolHUD.show(icon: "record.circle", message: self.strings.recordFailed)
             }
@@ -705,23 +744,25 @@ final class ScreenRecorderService: ObservableObject {
     /// sound and format are decided, or goes straight to a file for whoever
     /// only wanted the raw recording.
     private func deliver(_ take: RecorderTakeStore.Take, reason: String?) {
+        let owner = mcpRecordingID
         if reason == nil, UserDefaults.standard.bool(forKey: DefaultsKey.recorderOpenEditor) {
-            if openEditor(with: take) { return }
+            if openEditor(with: take, mcpOwnerID: owner) { return }
         }
-        saveDirect(take, reason: reason)
+        saveDirect(take, reason: reason, mcpOwnerID: owner)
     }
 
-    private func saveDirect(_ take: RecorderTakeStore.Take, reason: String?) {
+    private func saveDirect(_ take: RecorderTakeStore.Take, reason: String?, mcpOwnerID: UUID? = nil) {
         let destination = Self.saveDestination(strings: strings, fileExtension: "mov")
         do {
             try RecorderTakeStore.shared.saveDirectly(take, to: destination)
         } catch {
             NSSound.beep()
             QuickToolHUD.show(icon: "record.circle", message: strings.recordFailed)
-            openEditor(with: take)
+            openEditor(with: take, mcpOwnerID: mcpOwnerID)
             return
         }
         RecentCaptureService.shared.recordRecording(at: destination)
+        if let mcpOwnerID { MCPRecordingAdapter.shared.recordingDidExport(id: mcpOwnerID, url: destination) }
         let folder = destination.deletingLastPathComponent().lastPathComponent
         QuickToolHUD.show(icon: "record.circle",
                           message: reason ?? String(format: strings.savedHUDFormat, folder))

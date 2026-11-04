@@ -96,6 +96,19 @@ enum MixerOutputAdjustmentContract {
         }
 
         var mixer = make()
+        mixer.selectOutput(nil, volume: 0.2, muted: false)
+        var admissionCallback: Bool?
+        let missingDeviceAccepted = mixer.requestOutputAdjustment(volume: 0.3) { admissionCallback = $0 }
+        suite.expect(!missingDeviceAccepted && admissionCallback == false && mixer.halQueue.jobs.isEmpty,
+                     "an adjustment without an output device is rejected before scheduling")
+        mixer = make()
+        admissionCallback = nil
+        let accepted = mixer.requestOutputAdjustment(volume: 0.3) { admissionCallback = $0 }
+        suite.expect(accepted && admissionCallback == nil,
+                     "a valid adjustment is accepted before its asynchronous hardware result")
+        finish(mixer)
+        suite.expect(admissionCallback == true, "accepted adjustment still completes after hardware confirmation")
+        mixer = make()
         Hardware.volume = 0.02
         var zeroResult: Bool?
         mixer.requestOutputStep(level: { $0 - 0.1 }) { zeroResult = $0.handled }

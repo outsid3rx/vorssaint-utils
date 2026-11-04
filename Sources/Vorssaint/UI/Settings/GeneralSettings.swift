@@ -9,6 +9,7 @@ struct GeneralSettings: View {
     @ObservedObject private var l10n = L10n.shared
     @ObservedObject private var appearance = AppAppearanceController.shared
     @ObservedObject private var hotkeys = HotkeyManager.shared
+    @ObservedObject private var mcp = MCPControl.shared
     // Seeded from the stored choice so the switch does not flash off while
     // the status read is still on its way.
     @State private var loginRegistration: LaunchAtLoginSupport.Registration =
@@ -17,6 +18,13 @@ struct GeneralSettings: View {
     @State private var loginPending = false
     @State private var loginRefreshID = UUID()
     @AppStorage(DefaultsKey.hotkeyEnabled) private var hotkeyEnabled = true
+    @AppStorage(DefaultsKey.mcpEnabled) private var mcpEnabled = false
+    @AppStorage(DefaultsKey.mcpAudioEnabled) private var mcpAudioEnabled = false
+    @AppStorage(DefaultsKey.mcpDisplayEnabled) private var mcpDisplayEnabled = false
+    @AppStorage(DefaultsKey.mcpWindowEnabled) private var mcpWindowEnabled = false
+    @AppStorage(DefaultsKey.mcpCaptureEnabled) private var mcpCaptureEnabled = false
+    @AppStorage(DefaultsKey.mcpCaptureContentEnabled) private var mcpCaptureContentEnabled = false
+    @AppStorage(DefaultsKey.mcpRecordingEnabled) private var mcpRecordingEnabled = false
 
     private var text: GeneralSettingsStrings { FeatureStrings.generalSettings(l10n.language) }
     private var appearanceStrings: AppearanceStrings { FeatureStrings.appearance(l10n.language) }
@@ -27,6 +35,7 @@ struct GeneralSettings: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text(l10n.s.tabGeneral).font(.title2.bold())
                 basicsCard
+                mcpCard
                 appearanceCard
                 if AppFeature.keepAwake.isAvailable {
                     shortcutCard
@@ -41,6 +50,96 @@ struct GeneralSettings: View {
         .onReceive(NotificationCenter.default.publisher(
             for: LaunchAtLoginSupport.settingsRefreshRequested)) { _ in
             refreshLaunchAtLogin()
+        }
+    }
+
+    private var mcpCard: some View {
+        SettingsCard {
+            SettingsRow(symbol: "sparkles", title: "MCP", caption: mcpCaption) {
+                Toggle("MCP", isOn: $mcpEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .onChange(of: mcpEnabled) { _, _ in MCPControl.shared.syncWithPreferences() }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(mcpCategoryLabels.0, isOn: $mcpAudioEnabled)
+                Toggle(mcpCategoryLabels.1, isOn: $mcpDisplayEnabled)
+                Toggle(mcpCategoryLabels.2, isOn: $mcpWindowEnabled)
+                Toggle(mcpCaptureLabels.0, isOn: $mcpCaptureEnabled)
+                    .onChange(of: mcpCaptureEnabled) { _, _ in MCPControl.shared.syncCapturePermissions() }
+                Toggle(mcpCaptureLabels.1, isOn: $mcpCaptureContentEnabled)
+                    .disabled(!mcpCaptureEnabled)
+                    .onChange(of: mcpCaptureContentEnabled) { _, _ in MCPControl.shared.syncCapturePermissions() }
+                Toggle(mcpCaptureLabels.2, isOn: $mcpRecordingEnabled)
+                    .disabled(!mcpCaptureEnabled)
+                    .onChange(of: mcpRecordingEnabled) { _, _ in MCPControl.shared.syncCapturePermissions() }
+            }
+            .toggleStyle(TrailingSwitchToggleStyle())
+            .disabled(!mcpEnabled)
+            .padding(.leading, settingsRowTextInset)
+            if let error = mcp.lastError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var mcpCaptureLabels: (String, String, String) {
+        switch l10n.language {
+        case .enUS: return ("Screen capture selection", "Share selected capture results", "Screen recording control")
+        case .ru: return ("Выбор области захвата", "Передача выбранного результата", "Управление записью экрана")
+        case .uk: return ("Вибір області захоплення", "Передача вибраного результату", "Керування записом екрана")
+        case .ptBR: return ("Seleção de captura de tela", "Compartilhar resultados selecionados", "Controle de gravação de tela")
+        case .tr: return ("Ekran yakalama seçimi", "Seçilen yakalamaları paylaş", "Ekran kaydı kontrolü")
+        case .es: return ("Selección de captura de pantalla", "Compartir capturas seleccionadas", "Control de grabación de pantalla")
+        case .sk: return ("Výber snímania obrazovky", "Zdieľanie vybraných výsledkov", "Ovládanie záznamu obrazovky")
+        case .de: return ("Bildschirmaufnahme auswählen", "Ausgewählte Aufnahmen teilen", "Bildschirmaufzeichnung steuern")
+        case .fr: return ("Sélection de capture d’écran", "Partager les captures sélectionnées", "Contrôle de l’enregistrement d’écran")
+        case .it: return ("Selezione cattura schermo", "Condividi catture selezionate", "Controllo registrazione schermo")
+        case .ja: return ("画面キャプチャの選択", "選択したキャプチャ結果を共有", "画面収録の制御")
+        case .ko: return ("화면 캡처 선택", "선택한 캡처 결과 공유", "화면 녹화 제어")
+        case .zhHans: return ("选择屏幕捕获区域", "共享选定的捕获结果", "控制屏幕录制")
+        case .zhTW: return ("選取螢幕擷取區域", "分享選取的擷取結果", "控制螢幕錄影")
+        case .zhHK: return ("選取螢幕擷取區域", "分享選取的擷取結果", "控制螢幕錄影")
+        }
+    }
+
+    private var mcpCategoryLabels: (String, String, String) {
+        switch l10n.language {
+        case .enUS: return ("Sound and audio output", "Displays and brightness", "Active window layout")
+        case .ru: return ("Звук и аудиовыход", "Дисплеи и яркость", "Расположение активного окна")
+        case .uk: return ("Звук та аудіовихід", "Дисплеї та яскравість", "Розташування активного вікна")
+        case .ptBR: return ("Som e saída de áudio", "Telas e brilho", "Posição da janela ativa")
+        case .tr: return ("Ses ve ses çıkışı", "Ekranlar ve parlaklık", "Etkin pencere düzeni")
+        case .es: return ("Sonido y salida de audio", "Pantallas y brillo", "Posición de la ventana activa")
+        case .sk: return ("Zvuk a zvukový výstup", "Displeje a jas", "Rozloženie aktívneho okna")
+        case .de: return ("Ton und Audioausgang", "Displays und Helligkeit", "Anordnung des aktiven Fensters")
+        case .fr: return ("Son et sortie audio", "Écrans et luminosité", "Disposition de la fenêtre active")
+        case .it: return ("Audio e uscita audio", "Schermi e luminosità", "Posizione della finestra attiva")
+        case .ja: return ("サウンドと音声出力", "ディスプレイと明るさ", "アクティブなウインドウの配置")
+        case .ko: return ("사운드 및 오디오 출력", "디스플레이 및 밝기", "활성 윈도우 배치")
+        case .zhHans: return ("声音和音频输出", "显示器和亮度", "活动窗口布局")
+        case .zhTW: return ("聲音與音訊輸出", "顯示器與亮度", "使用中視窗的排列")
+        case .zhHK: return ("聲音與音訊輸出", "顯示器與亮度", "使用中視窗的排列")
+        }
+    }
+
+    private var mcpCaption: String {
+        switch l10n.language {
+        case .enUS: return "Allow processes on this Mac user account to control Keep Awake and the selected features through MCP."
+        case .ru: return "Разрешить процессам этой учётной записи управлять режимом без сна и выбранными функциями через MCP."
+        case .uk: return "Дозволити процесам цього облікового запису керувати режимом без сну та вибраними функціями через MCP."
+        case .ptBR: return "Permitir que processos desta conta controlem o modo ativo e as funções escolhidas via MCP."
+        case .tr: return "Bu hesapta çalışan işlemlerin uyanık kalma modunu ve seçilen özellikleri MCP ile yönetmesine izin ver."
+        case .es: return "Permitir que los procesos de esta cuenta controlen el modo activo y las funciones elegidas mediante MCP."
+        case .sk: return "Povoliť procesom tohto účtu ovládať režim bdenia a vybrané funkcie cez MCP."
+        case .de: return "Prozessen dieses Benutzerkontos erlauben, Wachhalten und ausgewählte Funktionen über MCP zu steuern."
+        case .fr: return "Autoriser les processus de ce compte à contrôler le maintien éveillé et les fonctions choisies via MCP."
+        case .it: return "Consenti ai processi di questo account di controllare la modalità attiva e le funzioni selezionate tramite MCP."
+        case .ja: return "このユーザーのプロセスによる MCP を使ったスリープ防止と選択した機能の制御を許可します。"
+        case .ko: return "이 사용자 계정의 프로세스가 MCP로 잠자기 방지와 선택한 기능을 제어하도록 허용합니다."
+        case .zhHans: return "允许此用户账户的进程通过 MCP 控制防止睡眠和所选功能。"
+        case .zhTW: return "允許此使用者帳號的程序透過 MCP 控制防止睡眠和所選功能。"
+        case .zhHK: return "允許此使用者帳戶的程序透過 MCP 控制防止睡眠和所選功能。"
         }
     }
 

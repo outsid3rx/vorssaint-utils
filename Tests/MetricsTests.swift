@@ -224,10 +224,17 @@ struct MetricsTests {
                 WindowServerCaptureContract.run(suite)
             }),
             ("keep-awake", {
+                MCPKeepAwakeTests.run(suite)
                 KeepAwakeCatalogContract.run(suite)
                 MenuPanelToggleLabelContract.run(suite)
                 KeepAwakeLidSleepTests.run { suite.expect($0, $1) }
                 KeepAwakeTimerHandoffTests.run { suite.expect($0, $1) }
+            }),
+            ("mcp-controls", {
+                MCPDisplayWindowTests.run(suite)
+                MCPCapturePolicyTests.run(suite)
+                MCPRecordingPolicyTests.run(suite)
+                MCPRecordingExportTests.run(suite)
             }),
             ("wallpaper", {
                 WallpaperContract.run(suite)

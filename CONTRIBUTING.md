@@ -6,9 +6,11 @@ under GPL-3.0-or-later unless stated otherwise.
 ## Getting started
 
 You need macOS 14 or newer, Apple Silicon and the Xcode Command Line Tools.
-The project builds with `build.sh`, without an Xcode project or external package
-dependencies. `Package.swift` supports editor indexing; it does not assemble or
-sign the app bundle.
+The project builds with `build.sh`, without an Xcode project. Building the
+bundled MCP server requires Swift 6.0 and the Swift packages locked in
+`Tools/MCPServer/Package.resolved` (a network connection or a populated SwiftPM
+cache). The root `Package.swift` supports editor indexing; it does not assemble
+or sign the app bundle.
 
 ```sh
 git clone https://github.com/vorssaint/vorssaint-utils.git
@@ -68,6 +70,15 @@ The test executable compiles a selected set of sources, so passing tests does no
 prove the app builds. Build the app and run its selftest for runtime, UI or bundled
 resource changes. CI also checks the optimized build, selftest, tests and packaging.
 Builds should finish without warnings.
+
+For MCP changes, the complete test suite also exercises the local IPC. To
+check MCP stdio through an isolated mock listener, build a separate test binary
+and run:
+
+```sh
+swift build --package-path Tools/MCPServer --scratch-path /tmp/vorssaint-mcp-test-build -c release --product VorssaintMCP -Xswiftc -swift-version -Xswiftc 5 -Xswiftc -DVORSSAINT_MCP_TEST
+python3 Tools/MCPServer/Tests/test_stdio_ipc.py /tmp/vorssaint-mcp-test-build/release/VorssaintMCP
+```
 
 For behavior involving windows, permissions or hardware, describe what you actually
 verified and on which Mac and macOS version. Include display, Spaces or language

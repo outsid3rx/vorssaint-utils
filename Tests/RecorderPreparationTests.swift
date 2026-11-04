@@ -76,6 +76,9 @@ enum RecorderPreparationTests {
         var isPreparingRecording = false
         var countdown: DispatchWorkItem?
         var pendingStartGeneration = 1
+        var mcpRecordingID: UUID?
+        var mcpOutcome: String?
+        var mcpAudioOptions: (systemAudio: Bool, microphone: Bool)?
         var starts = 0
         struct Strings { let recordFailed = "failed" }
         let strings = Strings()

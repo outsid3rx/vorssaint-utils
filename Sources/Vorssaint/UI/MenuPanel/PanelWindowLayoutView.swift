@@ -267,6 +267,7 @@ struct PanelWindowLayoutView: View {
         switch service.lastResult {
         case .success(let restored): return restored ? text.restored : text.done
         case .failure(.missingAccessibility): return text.missingPermission
+        case .failure(.sessionInactive), .failure(.ignoredApp), .failure(.mcpDisabled): return text.failed
         case .failure(.noWindow): return text.noWindow
         case .failure(.noRestore): return text.noRestore
         case .failure(.failed): return text.failed

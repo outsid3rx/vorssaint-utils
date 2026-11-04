@@ -7,6 +7,8 @@
 
 <h1 align="center">Vorssaint</h1>
 
+> This is an independent fork of [vorssaint/vorssaint-utils](https://github.com/vorssaint/vorssaint-utils) with local MCP control. It is not an official Vorssaint release.
+
 <p align="center">
   One menu bar icon doing the job of a dozen paid Mac apps.<br>
   Install only what you use.
@@ -23,9 +25,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/vorssaint/vorssaint-utils/releases"><img src="https://img.shields.io/github/v/release/vorssaint/vorssaint-utils?label=release&color=4c8dff" alt="Latest release"></a>
-  <a href="https://github.com/vorssaint/vorssaint-utils/releases"><img src="https://img.shields.io/github/downloads/vorssaint/vorssaint-utils/total?color=4c8dff" alt="Downloads"></a>
-  <a href="https://github.com/vorssaint/vorssaint-utils/actions/workflows/ci.yml"><img src="https://github.com/vorssaint/vorssaint-utils/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI status"></a>
+  <a href="https://github.com/outsid3rx/vorssaint-utils/releases"><img src="https://img.shields.io/github/v/release/outsid3rx/vorssaint-utils?label=fork%20release&color=4c8dff" alt="Latest fork release"></a>
+  <a href="https://github.com/outsid3rx/vorssaint-utils/actions/workflows/ci.yml"><img src="https://github.com/outsid3rx/vorssaint-utils/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="Fork CI status"></a>
   <a href="#what-you-need"><img src="https://img.shields.io/badge/macOS-14%2B%20Apple%20Silicon-black" alt="macOS 14 and newer, Apple Silicon"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue" alt="License GPL 3.0 or later"></a>
 </p>
@@ -188,15 +189,13 @@ Reorder or hide panel sections, choose a compact layout, and export settings to 
 
 ## Install
 
-With [Homebrew](https://brew.sh):
+Download the disk image from the [fork releases page](https://github.com/outsid3rx/vorssaint-utils/releases) and drag Vorssaint into Applications. Fork builds are not signed with an Apple Developer ID or notarized; macOS may require additional steps to open them, and permissions may need to be granted again after updates.
+
+The original project is also available through [Homebrew](https://brew.sh). This installs the official build, which does not include this fork's changes:
 
 ```sh
 brew install --cask vorssaint
 ```
-
-Or grab the disk image from the [releases page](https://github.com/vorssaint/vorssaint-utils/releases) and drag Vorssaint into Applications.
-
-Builds are signed with an Apple Developer ID and notarized, so macOS opens them without a fuss and your permissions survive updates.
 
 ## Uninstall
 
@@ -232,13 +231,13 @@ See the [permissions guide](docs/PERMISSIONS.md) for which features need access 
 ### Build it yourself
 
 ```sh
-git clone https://github.com/vorssaint/vorssaint-utils.git
+git clone https://github.com/outsid3rx/vorssaint-utils.git
 cd vorssaint-utils
 ./build.sh --dev            # build the separate Developer variant
 ./build.sh --dev --install  # install and launch it
 ```
 
-Xcode Command Line Tools are the only requirement. The [contributing guide](CONTRIBUTING.md) covers the layout and conventions. Official builds come only from the maintainer: the GPL covers the source, while the Vorssaint name, icon and look are covered by [TRADEMARKS.md](TRADEMARKS.md), so forks need their own identity.
+Xcode Command Line Tools with Swift 6.0 or newer and the MCP server's Swift packages are required. The [contributing guide](CONTRIBUTING.md) covers the layout and conventions. Official builds come only from the maintainer: the GPL covers the source, while the Vorssaint name, icon and look are covered by [TRADEMARKS.md](TRADEMARKS.md), so forks need their own identity.
 
 ## When something misbehaves
 
@@ -248,6 +247,7 @@ See [troubleshooting](docs/TROUBLESHOOTING.md) for launch problems, permissions 
 
 - [Privacy](docs/PRIVACY.md), what does and does not leave your Mac
 - [Permissions](docs/PERMISSIONS.md), every macOS permission in plain words
+- [Local MCP control](docs/MCP.md), connecting an agent to local controls and screen capture
 - [Troubleshooting](docs/TROUBLESHOOTING.md), the common fixes
 - [Contributing](CONTRIBUTING.md), build, layout and conventions
 - [Support](SUPPORT.md), where to get help

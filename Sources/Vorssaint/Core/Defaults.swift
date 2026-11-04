@@ -8,6 +8,13 @@ import Foundation
 /// Every UserDefaults key used by the app, in one place.
 enum DefaultsKey {
     static let language = "appLanguage"                   // AppLanguage.rawValue
+    static let mcpEnabled = "mcpEnabled" // local agent control, authorized on this Mac only
+    static let mcpAudioEnabled = "mcpAudioEnabled"
+    static let mcpDisplayEnabled = "mcpDisplayEnabled"
+    static let mcpWindowEnabled = "mcpWindowEnabled"
+    static let mcpCaptureEnabled = "mcpCaptureEnabled"
+    static let mcpCaptureContentEnabled = "mcpCaptureContentEnabled"
+    static let mcpRecordingEnabled = "mcpRecordingEnabled"
     static let appearance = "appAppearance"               // AppAppearance.rawValue
     static let liquidGlassEnabled = "liquidGlassEnabled"  // Liquid Glass in windows and panels on macOS 26+
     static let notchLiquidGlassEnabled = "notchLiquidGlassEnabled" // Dynamic Island glass, independently controlled
@@ -1231,6 +1238,13 @@ enum Defaults {
         DefaultsKey.keepAwakeMouseJiggleInterval: 5,
         DefaultsKey.hotkeyEnabled: true,
         DefaultsKey.launchAtLoginWanted: false,
+        DefaultsKey.mcpEnabled: false,
+        DefaultsKey.mcpAudioEnabled: false,
+        DefaultsKey.mcpDisplayEnabled: false,
+        DefaultsKey.mcpWindowEnabled: false,
+        DefaultsKey.mcpCaptureEnabled: false,
+        DefaultsKey.mcpCaptureContentEnabled: false,
+        DefaultsKey.mcpRecordingEnabled: false,
         DefaultsKey.keepAwakeShortcut: "control+option+command:40",
         DefaultsKey.keepAwakeIconTint: KeepAwakeIconTint.orange.rawValue,
         DefaultsKey.keepAwakeActiveIcon: KeepAwakeActiveIcon.vorssaint.rawValue,
