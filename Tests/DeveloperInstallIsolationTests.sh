@@ -21,16 +21,23 @@ signed=()
 stop_process() { stopped+=("$1"); }
 sign_installed_bundle() { signed+=("$1"); }
 
-for DEV in 1 0; do
+for variant in developer official fork; do
+    DEV=0
+    FORK=0
     stopped=()
     signed=()
-    for name in Vorss 'Vorssaint Utils' Vorssaint 'Vorssaint (Developer)'; do
+    for name in Vorss 'Vorssaint Utils' Vorssaint 'Vorssaint (Developer)' 'Menu Utility MCP'; do
         mkdir -p "$install_test_dir/Applications/$name.app"
         print original > "$install_test_dir/Applications/$name.app/content"
     done
-    if (( DEV )); then
+    if [[ "$variant" == developer ]]; then
+        DEV=1
         APP_NAME='Vorssaint (Developer)'
         EXECUTABLE=VorssaintDeveloper
+    elif [[ "$variant" == fork ]]; then
+        FORK=1
+        APP_NAME='Menu Utility MCP'
+        EXECUTABLE=MenuUtilityMCP
     else
         APP_NAME=Vorssaint
         EXECUTABLE=Vorssaint
@@ -40,7 +47,12 @@ for DEV in 1 0; do
     [[ "${signed[*]}" == "$install_test_dir/Applications/$APP_NAME.app" ]]
     if (( DEV )); then
         [[ "${stopped[*]}" == VorssaintDeveloper ]]
-        for name in Vorss 'Vorssaint Utils' Vorssaint; do
+        for name in Vorss 'Vorssaint Utils' Vorssaint 'Menu Utility MCP'; do
+            [[ "$(cat "$install_test_dir/Applications/$name.app/content")" == original ]]
+        done
+    elif (( FORK )); then
+        [[ "${stopped[*]}" == MenuUtilityMCP ]]
+        for name in Vorss 'Vorssaint Utils' Vorssaint 'Vorssaint (Developer)'; do
             [[ "$(cat "$install_test_dir/Applications/$name.app/content")" == original ]]
         done
     else
@@ -48,6 +60,7 @@ for DEV in 1 0; do
         [[ ! -e "$install_test_dir/Applications/Vorss.app" ]]
         [[ ! -e "$install_test_dir/Applications/Vorssaint Utils.app" ]]
         [[ "$(cat "$install_test_dir/Applications/Vorssaint (Developer).app/content")" == original ]]
+        [[ "$(cat "$install_test_dir/Applications/Menu Utility MCP.app/content")" == original ]]
     fi
 done
 print 'DEVELOPER INSTALL ISOLATION TESTS OK'
